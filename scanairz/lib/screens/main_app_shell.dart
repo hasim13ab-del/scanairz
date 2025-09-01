@@ -5,6 +5,7 @@ import 'history_screen.dart';
 import 'settings_screen.dart';
 import 'pc_sync_screen.dart';
 import 'help_section_screen.dart';
+import 'main_scan_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/custom_navbar.dart';
 
@@ -18,16 +19,23 @@ class MainAppShell extends ConsumerStatefulWidget {
 class _MainAppShellState extends ConsumerState<MainAppShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const BatchScanScreen(),
-    const HistoryScreen(),
-    const SettingsScreen(),
+  final List<Widget> _screens = const [
+    BatchScanScreen(),
+    HistoryScreen(),
+    SettingsScreen(),
   ];
 
   void _onItemTapped(int index) {
     setState(() {
       _currentIndex = index;
     });
+  }
+
+  void _navigateToScreen(Widget screen) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+    );
   }
 
   @override
@@ -39,12 +47,15 @@ class _MainAppShellState extends ConsumerState<MainAppShell> {
         backgroundColor: AppTheme.darkNavy,
         actions: [
           IconButton(
+            icon: const Icon(Icons.scanner),
+            onPressed: () {
+              _navigateToScreen(const MainScanScreen());
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.sync),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const PcSyncScreen()),
-              );
+              _navigateToScreen(const PcSyncScreen());
             },
           ),
         ],
@@ -54,11 +65,11 @@ class _MainAppShellState extends ConsumerState<MainAppShell> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            DrawerHeader(
+            const DrawerHeader(
               decoration: BoxDecoration(
-                color: AppTheme.primaryRed.withOpacity(0.8),
+                color: Color(0xCCE94560), // AppTheme.primaryRed with 80% opacity
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
@@ -67,7 +78,7 @@ class _MainAppShellState extends ConsumerState<MainAppShell> {
                     child: Text(
                       'S',
                       style: TextStyle(
-                        color: AppTheme.primaryRed,
+                        color: Color(0xFFE94560), // AppTheme.primaryRed
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -94,6 +105,14 @@ class _MainAppShellState extends ConsumerState<MainAppShell> {
             ),
             ListTile(
               leading: const Icon(Icons.scanner, color: Colors.white),
+              title: const Text('Scan Barcode', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToScreen(const MainScanScreen());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.list, color: Colors.white),
               title: const Text('Batch Scan', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
@@ -127,10 +146,7 @@ class _MainAppShellState extends ConsumerState<MainAppShell> {
               title: const Text('PC Sync', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const PcSyncScreen()),
-                );
+                _navigateToScreen(const PcSyncScreen());
               },
             ),
             ListTile(
@@ -138,13 +154,10 @@ class _MainAppShellState extends ConsumerState<MainAppShell> {
               title: const Text('Help & Support', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HelpSectionScreen()),
-                );
+                _navigateToScreen(const HelpSectionScreen());
               },
             ),
-            const Divider(color: Colors.white24),
+            const Divider(color: Color(0x3DFFFFFF)), // White with 24% opacity
             ListTile(
               leading: const Icon(Icons.exit_to_app, color: Colors.white),
               title: const Text('Exit', style: TextStyle(color: Colors.white)),
@@ -161,6 +174,13 @@ class _MainAppShellState extends ConsumerState<MainAppShell> {
         currentIndex: _currentIndex,
         onTap: _onItemTapped,
       ),
+      floatingActionButton: _currentIndex == 0 ? FloatingActionButton(
+        onPressed: () {
+          _navigateToScreen(const MainScanScreen());
+        },
+        backgroundColor: const Color(0xFFE94560), // AppTheme.primaryRed
+        child: const Icon(Icons.scanner),
+      ) : null,
     );
   }
 }

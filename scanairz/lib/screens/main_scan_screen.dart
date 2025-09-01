@@ -14,13 +14,21 @@ class MainScanScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScanScreen> createState() => _MainScanScreenState();
 }
 
-class _MainScanScreenState extends ConsumerState<MainScanScreen> {
-  MobileScannerController cameraController = MobileScannerController();
+class _MainScanScreenState extends ConsumerState<MainScanScreen> with SingleTickerProviderStateMixin {
+  final MobileScannerController cameraController = MobileScannerController();
   bool isScanning = false;
+  bool isFlashOn = false;
+  bool isFrontCamera = false;
+  late AnimationController _animationController;
+  DateTime? _lastScanTime;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true); // 🔥 continuous laser animation
     startScanning();
   }
 
@@ -38,38 +46,80 @@ class _MainScanScreenState extends ConsumerState<MainScanScreen> {
     cameraController.stop();
   }
 
-  void toggleFlash() {
-    cameraController.toggleTorch();
+  Future<void> toggleFlash() async {
+    try {
+      await cameraController.toggleTorch();
+      setState(() {
+        isFlashOn = !isFlashOn;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Flash not available: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
-  void switchCamera() {
-    cameraController.switchCamera();
+  Future<void> switchCamera() async {
+    try {
+      await cameraController.switchCamera();
+      setState(() {
+        isFrontCamera = !isFrontCamera;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Camera switch failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void handleBarcode(Barcode barcode) {
+    final now = DateTime.now();
+    if (_lastScanTime != null && now.difference(_lastScanTime!) < const Duration(seconds: 2)) {
+      return;
+    }
+
     if (barcode.rawValue != null) {
-      // Add to scan results
+      _lastScanTime = now;
+
+      // Save result
       ref.read(scanResultsProvider.notifier).addScanResult(
         ScanResult.fromData(barcode.rawValue!, barcode.format.name),
       );
-      
-      // Provide feedback
+
+      // Feedback
       Vibration.vibrate(duration: 200);
-      
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Scanned: ${barcode.rawValue}'),
-          backgroundColor: Colors.green,
-        ),
-      );
+
+      // Show message
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('Scanned: ${barcode.rawValue}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+      }
+
+      // ❌ no animation restart needed, beam is continuous
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkNavy,
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Scan Barcode'),
         backgroundColor: AppTheme.darkNavy,
@@ -79,11 +129,12 @@ class _MainScanScreenState extends ConsumerState<MainScanScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.flash_on),
+            icon: Icon(isFlashOn ? Icons.flash_on : Icons.flash_off),
             onPressed: toggleFlash,
+            color: isFlashOn ? AppTheme.primaryRed : Colors.white,
           ),
           IconButton(
-            icon: const Icon(Icons.cameraswitch),
+            icon: Icon(isFrontCamera ? Icons.camera_front : Icons.camera_rear),
             onPressed: switchCamera,
           ),
         ],
@@ -93,13 +144,12 @@ class _MainScanScreenState extends ConsumerState<MainScanScreen> {
           MobileScanner(
             controller: cameraController,
             onDetect: (capture) {
-              final barcodes = capture.barcodes;
-              for (final barcode in barcodes) {
+              for (final barcode in capture.barcodes) {
                 handleBarcode(barcode);
               }
             },
           ),
-          const ScannerOverlay(),
+          ScannerOverlay(animationController: _animationController),
           Positioned(
             bottom: 20,
             left: 0,
@@ -130,6 +180,7 @@ class _MainScanScreenState extends ConsumerState<MainScanScreen> {
 
   @override
   void dispose() {
+    _animationController.dispose();
     cameraController.dispose();
     super.dispose();
   }
