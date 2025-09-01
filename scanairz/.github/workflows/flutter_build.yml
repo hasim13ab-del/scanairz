@@ -3,11 +3,14 @@ name: Flutter Build
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch: # manual trigger
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scanairz # 👈 important, your Flutter app is here
 
     steps:
       - name: Checkout source
@@ -31,4 +34,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: flutter-apks
-          path: build/app/outputs/flutter-apk/*.apk
+          path: scanairz/build/app/outputs/flutter-apk/*.apk
