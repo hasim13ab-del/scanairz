@@ -9,34 +9,43 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 1️⃣ Checkout the code
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # 2️⃣ Set up JDK
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          java-version: "17"  # Use Java 17 for latest Flutter builds
+          java-version: 17
+          distribution: temurin  # Required in v3
 
+      # 3️⃣ Set up Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.16.x"
 
+      # 4️⃣ Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
+      # 5️⃣ Build Release APK
       - name: Build Release APK
         run: flutter build apk --release
 
+      # 6️⃣ Upload Release APK
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
+      # 7️⃣ Build Debug APK
       - name: Build Debug APK
         run: flutter build apk --debug
 
+      # 8️⃣ Upload Debug APK
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
