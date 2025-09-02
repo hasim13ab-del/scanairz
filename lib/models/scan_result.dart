@@ -1,62 +1,44 @@
-import 'package:flutter/foundation.dart';
-
-@immutable
 class ScanResult {
   final String id;
-  final String data;
+  final String barcode;
   final String format;
   final DateTime timestamp;
+  final String? notes;
 
-  const ScanResult({
+  ScanResult({
     required this.id,
-    required this.data,
+    required this.barcode,
     required this.format,
     required this.timestamp,
+    this.notes,
   });
-
-  factory ScanResult.fromData(String data, String format) {
-    return ScanResult(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      data: data,
-      format: format,
-      timestamp: DateTime.now(),
-    );
-  }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'data': data,
+      'barcode': barcode,
       'format': format,
       'timestamp': timestamp.toIso8601String(),
+      'notes': notes,
     };
   }
 
   factory ScanResult.fromMap(Map<String, dynamic> map) {
     return ScanResult(
       id: map['id'],
-      data: map['data'],
+      barcode: map['barcode'],
       format: map['format'],
       timestamp: DateTime.parse(map['timestamp']),
+      notes: map['notes'],
     );
   }
 
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-  
-    return other is ScanResult &&
-      other.id == id &&
-      other.data == data &&
-      other.format == format &&
-      other.timestamp == timestamp;
-  }
-
-  @override
-  int get hashCode {
-    return id.hashCode ^
-      data.hashCode ^
-      format.hashCode ^
-      timestamp.hashCode;
+  factory ScanResult.fromData(String barcodeData, String format) {
+    return ScanResult(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      barcode: barcodeData,
+      format: format,
+      timestamp: DateTime.now(),
+    );
   }
 }

@@ -1,17 +1,19 @@
+import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
 
 class ConnectivityManager {
   final Connectivity _connectivity = Connectivity();
-  final ValueNotifier<bool> isConnected = ValueNotifier<bool>(true);
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
-  ConnectivityManager() {
-    _init();
+  Stream<List<ConnectivityResult>> get onConnectivityChanged {
+    return _connectivity.onConnectivityChanged;
   }
 
-  void _init() async {
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> result) {
-      isConnected.value = result.isNotEmpty && result.first != ConnectivityResult.none;
-    });
+  Future<List<ConnectivityResult>> checkConnectivity() async {
+    return await _connectivity.checkConnectivity();
+  }
+
+  void dispose() {
+    _connectivitySubscription?.cancel();
   }
 }

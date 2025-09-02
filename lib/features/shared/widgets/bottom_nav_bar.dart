@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-class CustomNavBar extends StatelessWidget {
+class BottomNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
 
-  const CustomNavBar({
+  const BottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
@@ -18,23 +18,17 @@ class CustomNavBar extends StatelessWidget {
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.qr_code_scanner),
-          label: 'Scanner',
+          label: 'Scan',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.history),
           label: 'History',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.sync),
-          label: 'PC Sync',
-        ),
-        BottomNavigationBarItem(
           icon: Icon(Icons.settings),
           label: 'Settings',
         ),
       ],
-      selectedItemColor: Theme.of(context).primaryColor,
-      unselectedItemColor: Colors.grey,
     );
   }
 }

@@ -1,43 +1,40 @@
 import 'package:flutter/material.dart';
+import 'animated_scanning_line.dart';
 
 class ScannerOverlay extends StatelessWidget {
-  const ScannerOverlay({super.key});
+  final AnimationController animationController;
+
+  const ScannerOverlay({super.key, required this.animationController});
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
+    // dynamic centered scan box (square 70% width)
+    final boxSize = size.width * 0.7;
+    final top = (size.height - boxSize) / 2;
+
     return Stack(
       children: [
-        ColorFiltered(
-          colorFilter: const ColorFilter.mode(
-            Colors.black,
-            BlendMode.srcOut,
-          ),
+        // Scanner box
+        Positioned(
+          top: top,
+          left: (size.width - boxSize) / 2,
           child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.transparent,
-            ),
-            child: Align(
-              alignment: Alignment.center,
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            width: boxSize,
+            height: boxSize,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.green, width: 3),
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),
-        const Positioned(
-          bottom: 100,
-          left: 0,
-          right: 0,
-          child: Text(
-            'Align barcode within the frame',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 16),
-          ),
+
+        // Moving scan line
+        AnimatedScanningLine(
+          animationController: animationController,
+          top: top,
+          boxSize: boxSize,
         ),
       ],
     );

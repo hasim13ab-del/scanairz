@@ -1,26 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scanairz/services/storage_service.dart';
 import '../models/scan_result.dart';
 
-final scanResultsProvider = StateNotifierProvider<ScanResultsNotifier, List<ScanResult>>((ref) {
-  return ScanResultsNotifier();
+final storageServiceProvider = Provider<StorageService>((ref) {
+  return StorageService();
 });
 
-class ScanResultsNotifier extends StateNotifier<List<ScanResult>> {
-  ScanResultsNotifier() : super([]);
+class ScannedCodesNotifier extends StateNotifier<List<ScanResult>> {
+  final StorageService _storageService;
 
-  void addScanResult(ScanResult result) {
-    state = [...state, result];
+  ScannedCodesNotifier(this._storageService) : super([]);
+
+  Future<void> loadScannedCodes() async {
+    state = await _storageService.loadScanResults();
   }
 
-  void removeScanResult(String id) {
-    state = state.where((result) => result.id != id).toList();
+  void addScannedCode(ScanResult result) {
+    if (!state.any((element) => element.barcode == result.barcode)) {
+      state = [...state, result];
+      _storageService.saveScanResults(state);
+    }
   }
-
-  void updateScanResult(ScanResult updatedResult) {
-    state = state.map((result) => result.id == updatedResult.id ? updatedResult : result).toList();
-  }
-
+  
   void clearAll() {
     state = [];
+    _storageService.saveScanResults(state);
   }
 }
+
+final scannedCodesProvider = StateNotifierProvider<ScannedCodesNotifier, List<ScanResult>>((ref) {
+  final storageService = ref.watch(storageServiceProvider);
+  return ScannedCodesNotifier(storageService)..loadScannedCodes();
+});
