@@ -14,19 +14,23 @@ class AnimatedScanningLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animationController,
-      builder: (context, child) {
-        return Positioned(
-          top: top + (animationController.value * boxSize),
-          left: (MediaQuery.of(context).size.width - boxSize) / 2,
-          child: Container(
-            width: boxSize,
-            height: 3,
-            color: Colors.redAccent,
-          ),
-        );
-      },
+    return Positioned(
+      top: top,
+      left: (MediaQuery.of(context).size.width - boxSize) / 2,
+      width: boxSize,
+      height: boxSize,
+      child: AnimatedBuilder(
+        animation: animationController,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(0, animationController.value * boxSize),
+            child: Container(
+              height: 2,
+              color: Colors.green,
+            ),
+          );
+        },
+      ),
     );
   }
 }

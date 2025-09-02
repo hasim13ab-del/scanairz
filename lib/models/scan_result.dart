@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ScanResult {
   final String id;
   final String barcode;
@@ -32,6 +34,10 @@ class ScanResult {
       notes: map['notes'],
     );
   }
+
+  String toJson() => json.encode(toMap());
+
+  factory ScanResult.fromJson(String source) => ScanResult.fromMap(json.decode(source));
 
   factory ScanResult.fromData(String barcodeData, String format) {
     return ScanResult(

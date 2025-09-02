@@ -3,33 +3,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/scan_result.dart';
 
 class StorageService {
-  static const String _scanResultsKey = 'scanResults';
-  static const String _settingsKey = 'appSettings';
+  static const _key = 'scanned_codes';
 
   Future<void> saveScanResults(List<ScanResult> results) async {
     final prefs = await SharedPreferences.getInstance();
-    List<String> resultsJson = results.map((result) => json.encode(result.toMap())).toList();
-    await prefs.setStringList(_scanResultsKey, resultsJson);
+    final encoded = results.map((e) => jsonEncode(e.toJson())).toList();
+    await prefs.setStringList(_key, encoded);
   }
 
   Future<List<ScanResult>> loadScanResults() async {
     final prefs = await SharedPreferences.getInstance();
-    final List<String>? data = prefs.getStringList(_scanResultsKey);
-    if (data == null) return [];
-    
-    return data.map((item) => ScanResult.fromMap(json.decode(item))).toList();
-  }
-
-  Future<void> saveSettings(Map<String, dynamic> settings) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_settingsKey, json.encode(settings));
-  }
-
-  Future<Map<String, dynamic>> loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? data = prefs.getString(_settingsKey);
-    if (data == null) return {};
-    
-    return json.decode(data);
+    final encoded = prefs.getStringList(_key) ?? [];
+    return encoded.map((e) => ScanResult.fromJson(jsonDecode(e))).toList();
   }
 }
