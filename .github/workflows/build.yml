@@ -1,33 +1,35 @@
-name: Build Flutter APK
+name: Build Flutter APKs
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger on push to main branch
+  workflow_dispatch: {}  # Optional: allow manual trigger
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      # 1️⃣ Checkout the code
+      # 1️⃣ Checkout code
       - name: Checkout code
         uses: actions/checkout@v3
 
       # 2️⃣ Set up JDK
-      - name: Set up JDK
+      - name: Set up Java
         uses: actions/setup-java@v3
         with:
           java-version: 17
-          distribution: temurin  # Required in v3
+          distribution: temurin
 
       # 3️⃣ Set up Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.16.x"
+          flutter-version: "3.16.x"  # Adjust if needed
 
       # 4️⃣ Install dependencies
-      - name: Install dependencies
+      - name: Install Flutter dependencies
         run: flutter pub get
 
       # 5️⃣ Build Release APK
