@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "920147832690",
+    "project_id": "scanairzapp",
+    "storage_bucket": "scanairzapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:920147832690:android:9aaa19b756e578495837eb",
+        "android_client_info": {
+          "package_name": "com.airz.scanairz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCm3CVafSdkGA9bZxENSWkFce7y41wHOWE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
