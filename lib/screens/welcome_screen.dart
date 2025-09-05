@@ -1,55 +1,36 @@
-import 'package:flutter/material.dart';
-import 'package:scanairz/main.dart';
 
-class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+import 'package:flutter/material.dart';
+
+class AboutUsScreen extends StatelessWidget {
+  const AboutUsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
+      appBar: AppBar(
+        title: const Text('About Us'),
+      ),
+      body: const Center(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.all(16.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Placeholder for the logo
-              const Icon(
-                Icons.camera,
-                size: 100,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Scanairz',
+              Text(
+                'AiRZ Technologies Pvt. Ltd.',
                 style: TextStyle(
-                  fontSize: 48,
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'Your pocket companion for seamless scanning.',
+              SizedBox(height: 16),
+              Text(
+                'Connecting devices, powering productivity.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 18,
+                  fontStyle: FontStyle.italic,
                 ),
-              ),
-              const SizedBox(height: 48),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MainScreen(),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                  textStyle: const TextStyle(fontSize: 20),
-                ),
-                child: const Text('Get Started'),
               ),
             ],
           ),

@@ -15,6 +15,8 @@ class SettingsService {
   static const String _saveHistoryKey = 'saveHistory';
   static const String _autoClearHistoryDaysKey = 'autoClearHistoryDays';
 
+  // Appearance
+  static const String _themeKey = 'theme';
 
   Future<void> saveSettings({
     required String connectionMethod,
@@ -25,6 +27,7 @@ class SettingsService {
     required bool laserAnimation,
     required bool saveHistory,
     required int autoClearHistoryDays,
+    required String theme,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_connectionMethodKey, connectionMethod);
@@ -35,6 +38,7 @@ class SettingsService {
     await prefs.setBool(_laserAnimationKey, laserAnimation);
     await prefs.setBool(_saveHistoryKey, saveHistory);
     await prefs.setInt(_autoClearHistoryDaysKey, autoClearHistoryDays);
+    await prefs.setString(_themeKey, theme);
   }
 
   Future<Map<String, dynamic>> loadSettings() async {
@@ -48,6 +52,7 @@ class SettingsService {
       'laserAnimation': prefs.getBool(_laserAnimationKey) ?? true,
       'saveHistory': prefs.getBool(_saveHistoryKey) ?? true,
       'autoClearHistoryDays': prefs.getInt(_autoClearHistoryDaysKey) ?? 7,
+      'theme': prefs.getString(_themeKey) ?? 'System',
     };
   }
 }

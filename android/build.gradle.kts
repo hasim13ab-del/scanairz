@@ -1,3 +1,4 @@
+
 buildscript {
     repositories {
         google()
@@ -5,7 +6,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.google.gms:google-services:4.3.15")
+        classpath("com.google.gms:google-services:4.4.1")
     }
 }
 

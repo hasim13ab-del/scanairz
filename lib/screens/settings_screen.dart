@@ -1,5 +1,12 @@
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:scanairz/screens/about_screen.dart';
+import 'package:scanairz/screens/help_guide_screen.dart';
+import 'package:scanairz/services/network_discovery_service.dart';
 import 'package:scanairz/services/settings_service.dart';
+import 'package:scanairz/theme_notifier.dart';
+import 'package:scanairz/themes.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -10,11 +17,15 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsService _settingsService = SettingsService();
+  final NetworkDiscoveryService _networkDiscoveryService =
+      NetworkDiscoveryService();
 
   // PC Connection
   String _connectionMethod = 'Wi-Fi';
   final TextEditingController _ipAddressController = TextEditingController();
   final TextEditingController _portController = TextEditingController();
+  List<String> _discoveredDevices = [];
+  bool _isDiscovering = false;
 
   // Scanning Preferences
   bool _continuousScan = false;
@@ -24,6 +35,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Storage Options
   bool _saveHistory = true;
   int _autoClearHistoryDays = 7;
+
+  // Appearance
+  String _theme = 'System';
+
+  @override
+  void initState() {
+    super.initState();
+    _networkDiscoveryService.discoveredDevices.listen((devices) {
+      setState(() {
+        _discoveredDevices = devices;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _networkDiscoveryService.dispose();
+    _ipAddressController.dispose();
+    _portController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _laserAnimation = settings['laserAnimation']!;
             _saveHistory = settings['saveHistory']!;
             _autoClearHistoryDays = settings['autoClearHistoryDays']!;
+            _theme = settings['theme'] ?? 'System';
 
             return ListView(
               padding: const EdgeInsets.all(16.0),
@@ -60,6 +93,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Divider(height: 32),
                 _buildSectionTitle('Storage Options'),
                 _buildStorageOptions(),
+                const Divider(height: 32),
+                _buildSectionTitle('Appearance'),
+                _buildThemeSettings(),
+                const Divider(height: 32),
+                _buildSectionTitle('About'),
+                _buildHelpAndAbout(),
                 const SizedBox(height: 32),
                 Center(
                   child: ElevatedButton(
@@ -78,7 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      style: Theme.of(context).textTheme.titleLarge,
     );
   }
 
@@ -107,6 +146,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
           },
         ),
         if (_connectionMethod == 'Wi-Fi') ...[
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              if (_isDiscovering) {
+                _networkDiscoveryService.stopDiscovery();
+              } else {
+                _networkDiscoveryService.startDiscovery();
+              }
+              setState(() {
+                _isDiscovering = !_isDiscovering;
+              });
+            },
+            child: Text(_isDiscovering ? 'Stop Scanning' : 'Scan for Devices'),
+          ),
+          if (_isDiscovering)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          if (_discoveredDevices.isNotEmpty)
+            SizedBox(
+              height: 150,
+              child: ListView.builder(
+                itemCount: _discoveredDevices.length,
+                itemBuilder: (context, index) {
+                  final deviceIp = _discoveredDevices[index];
+                  return ListTile(
+                    title: Text(deviceIp),
+                    onTap: () {
+                      setState(() {
+                        _ipAddressController.text = deviceIp;
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _ipAddressController,
@@ -190,7 +268,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildThemeSettings() {
+    return DropdownButtonFormField<String>(
+      value: _theme,
+      decoration: const InputDecoration(
+        labelText: 'Theme',
+        border: OutlineInputBorder(),
+      ),
+      items: ['Light', 'Dark', 'System']
+          .map((label) => DropdownMenuItem(
+                value: label,
+                child: Text(label),
+              ))
+          .toList(),
+      onChanged: (value) {
+        if (value != null) {
+          setState(() {
+            _theme = value;
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildHelpAndAbout() {
+    return Column(
+      children: [
+        ListTile(
+          title: const Text('Help'),
+          leading: const Icon(Icons.help_outline),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const HelpGuideScreen(),
+              ),
+            );
+          },
+        ),
+        ListTile(
+          title: const Text('About'),
+          leading: const Icon(Icons.info_outline),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AboutScreen(),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   Future<void> _saveSettings() async {
+    final themeNotifier = Provider.of<ThemeNotifier>(context, listen: false);
+
+    if (_theme == 'Light') {
+      themeNotifier.setTheme(AppThemes.lightTheme);
+    } else if (_theme == 'Dark') {
+      themeNotifier.setTheme(AppThemes.darkTheme);
+    } else {
+      // System theme
+      final brightness = MediaQuery.of(context).platformBrightness;
+      if (brightness == Brightness.dark) {
+        themeNotifier.setTheme(AppThemes.darkTheme);
+      } else {
+        themeNotifier.setTheme(AppThemes.lightTheme);
+      }
+    }
+
     await _settingsService.saveSettings(
       connectionMethod: _connectionMethod,
       ipAddress: _ipAddressController.text,
@@ -200,7 +348,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       laserAnimation: _laserAnimation,
       saveHistory: _saveHistory,
       autoClearHistoryDays: _autoClearHistoryDays,
+      theme: _theme,
     );
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Settings saved!')),

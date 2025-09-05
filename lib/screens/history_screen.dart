@@ -1,29 +1,40 @@
+
 import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:scanairz/models/scan_result.dart';
-import 'package:scanairz/providers/scanner_provider.dart';
+import 'package:scanairz/services/storage_service.dart';
 import 'package:share_plus/share_plus.dart';
 
-class HistoryScreen extends ConsumerStatefulWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
+  State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+class _HistoryScreenState extends State<HistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final StorageService _storageService = StorageService();
   DateTimeRange? _selectedDateRange;
+  List<ScanResult> _scans = [];
 
   @override
   void initState() {
     super.initState();
-    // Rebuild the widget when the search text changes
+    _loadHistory();
     _searchController.addListener(() => setState(() {}));
+  }
+
+  Future<void> _loadHistory() async {
+    final history = await _storageService.loadScanResults();
+    if (mounted) {
+      setState(() {
+        _scans = history;
+      });
+    }
   }
 
   @override
@@ -51,12 +62,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       });
     }
   }
-  
+
   Future<void> _exportHistory(List<ScanResult> scans) async {
     if (scans.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No history to export.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No history to export.')),
+        );
+      }
       return;
     }
 
@@ -80,20 +93,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     Share.shareXFiles([xFile], subject: 'ScanAirz History Export');
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final allScans = ref.watch(scannedCodesProvider);
     final theme = Theme.of(context);
 
     // Filter the scans based on the search query and date range
-    final filteredScans = allScans.where((scan) {
+    final filteredScans = _scans.where((scan) {
       final query = _searchController.text.toLowerCase();
       final barcodeMatch = scan.barcode.toLowerCase().contains(query);
       final dateMatch = _selectedDateRange == null
           ? true
           : scan.timestamp.isAfter(_selectedDateRange!.start) &&
-              scan.timestamp.isBefore(_selectedDateRange!.end.add(const Duration(days: 1)));
+              scan.timestamp
+                  .isBefore(_selectedDateRange!.end.add(const Duration(days: 1)));
       return barcodeMatch && dateMatch;
     }).toList().reversed.toList(); // Show newest first
 
@@ -113,7 +125,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.delete_forever),
-            onPressed: () => _showClearConfirmation(context, ref),
+            onPressed: () async {
+              final confirmed = await _showClearConfirmationDialog(context);
+              if (confirmed == true) {
+                await _storageService.clearScanResults();
+                _loadHistory();
+                _searchController.clear();
+                setState(() {
+                  _selectedDateRange = null;
+                });
+              }
+            },
           ),
         ],
       ),
@@ -127,13 +149,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 hintText: 'Search by barcode...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25.0),
-                  borderSide: BorderSide(color: theme.colorScheme.surface)
-                ),
+                    borderRadius: BorderRadius.circular(25.0),
+                    borderSide: BorderSide(color: theme.colorScheme.surface)),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25.0),
-                  borderSide: BorderSide(color: theme.colorScheme.secondary)
-                ),
+                    borderRadius: BorderRadius.circular(25.0),
+                    borderSide: BorderSide(color: theme.colorScheme.secondary)),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
@@ -146,8 +166,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      '''From: ${DateFormat.yMMMd().format(_selectedDateRange!.start)}
-To: ${DateFormat.yMMMd().format(_selectedDateRange!.end)}''',
+                      '''From: ${DateFormat.yMMMd().format(_selectedDateRange!.start)}\nTo: ${DateFormat.yMMMd().format(_selectedDateRange!.end)}''',
                       style: theme.textTheme.bodySmall,
                     ),
                   ),
@@ -213,10 +232,9 @@ To: ${DateFormat.yMMMd().format(_selectedDateRange!.end)}''',
                               IconButton(
                                 icon: Icon(Icons.delete,
                                     color: theme.colorScheme.error),
-                                onPressed: () {
-                                  ref
-                                      .read(scannedCodesProvider.notifier)
-                                      .removeScannedCode(result);
+                                onPressed: () async {
+                                  await _storageService.removeScanResult(result);
+                                  _loadHistory();
                                 },
                               ),
                             ],
@@ -231,8 +249,8 @@ To: ${DateFormat.yMMMd().format(_selectedDateRange!.end)}''',
     );
   }
 
-  void _showClearConfirmation(BuildContext context, WidgetRef ref) {
-    showDialog(
+  Future<bool?> _showClearConfirmationDialog(BuildContext context) {
+    return showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
@@ -242,18 +260,11 @@ To: ${DateFormat.yMMMd().format(_selectedDateRange!.end)}''',
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
               child: Text('Clear', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              onPressed: () {
-                ref.read(scannedCodesProvider.notifier).clearAll();
-                _searchController.clear();
-                setState(() {
-                  _selectedDateRange = null;
-                });
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(true),
             ),
           ],
         );

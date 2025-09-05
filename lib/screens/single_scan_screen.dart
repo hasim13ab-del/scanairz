@@ -1,27 +1,29 @@
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import 'package:scanairz/models/scan_result.dart';
-import 'package:scanairz/providers/scanner_provider.dart';
 import 'package:scanairz/services/pc_connector.dart';
 import 'package:scanairz/services/settings_service.dart';
+import 'package:scanairz/services/storage_service.dart';
 import 'package:vibration/vibration.dart';
 
-class SingleScanScreen extends ConsumerStatefulWidget {
+class SingleScanScreen extends StatefulWidget {
   const SingleScanScreen({super.key});
 
   @override
-  ConsumerState<SingleScanScreen> createState() => _SingleScanScreenState();
+  State<SingleScanScreen> createState() => _SingleScanScreenState();
 }
 
-class _SingleScanScreenState extends ConsumerState<SingleScanScreen>
+class _SingleScanScreenState extends State<SingleScanScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   final MobileScannerController _scannerController = MobileScannerController();
-  final SettingsService _settingsService = SettingsService();
-  final PcConnector _pcConnector = PcConnector();
+  late SettingsService _settingsService;
+  late StorageService _storageService;
+  late PcConnector _pcConnector;
 
-  late Future<Map<String, dynamic>> _settingsFuture;
+  Future<Map<String, dynamic>>? _settingsFuture;
 
   bool _continuousScan = false;
   bool _vibration = true;
@@ -31,11 +33,21 @@ class _SingleScanScreenState extends ConsumerState<SingleScanScreen>
   @override
   void initState() {
     super.initState();
-    _settingsFuture = _loadSettings();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_settingsFuture == null) {
+      _settingsService = Provider.of<SettingsService>(context, listen: false);
+      _storageService = Provider.of<StorageService>(context, listen: false);
+      _pcConnector = Provider.of<PcConnector>(context, listen: false);
+      _settingsFuture = _loadSettings();
+    }
   }
 
   Future<Map<String, dynamic>> _loadSettings() async {
@@ -62,6 +74,15 @@ class _SingleScanScreenState extends ConsumerState<SingleScanScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Single Scan'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flashlight_on_outlined),
+            onPressed: () {
+              _scannerController.toggleTorch();
+            },
+            tooltip: 'Torch',
+          ),
+        ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
           future: _settingsFuture,
@@ -82,7 +103,7 @@ class _SingleScanScreenState extends ConsumerState<SingleScanScreen>
                         onDetect: (capture) {
                           final barcodes = capture.barcodes;
                           if (barcodes.isNotEmpty) {
-                            _onBarcodeDetect(barcodes.first, ref);
+                            _onBarcodeDetect(barcodes.first);
                           }
                         },
                       ),
@@ -110,6 +131,13 @@ class _SingleScanScreenState extends ConsumerState<SingleScanScreen>
                             );
                           },
                         ),
+                      CustomPaint(
+                        painter: BarcodeBoxPainter(),
+                        child: const SizedBox(
+                          width: scanWindowSize,
+                          height: scanWindowSize,
+                        ),
+                      )
                     ],
                   ),
                 ),
@@ -119,7 +147,7 @@ class _SingleScanScreenState extends ConsumerState<SingleScanScreen>
     );
   }
 
-  void _onBarcodeDetect(Barcode barcode, WidgetRef ref) async {
+  void _onBarcodeDetect(Barcode barcode) async {
     final scanResult = barcode.rawValue;
     if (scanResult == null) {
       return;
@@ -137,14 +165,16 @@ class _SingleScanScreenState extends ConsumerState<SingleScanScreen>
     );
 
     if (_saveHistory) {
-      ref.read(scannedCodesProvider.notifier).addScannedCode(newScan);
+      final history = await _storageService.loadHistory();
+      history.add(newScan);
+      await _storageService.saveHistory(history);
     }
 
     await _pcConnector.syncData([newScan]);
 
     if (!_continuousScan) {
       _scannerController.stop();
-      if(mounted) {
+      if (mounted) {
         showDialog(
           context: context,
           barrierDismissible: false, // User must tap button!
@@ -159,9 +189,9 @@ class _SingleScanScreenState extends ConsumerState<SingleScanScreen>
         ).then((_) => _scannerController.start());
       }
     } else {
-      if(mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Scanned: $scanResult')),
+          SnackBar(content: Text('Scanned: $scanResult')),
         );
       }
     }
@@ -237,5 +267,54 @@ class _SingleScanScreenState extends ConsumerState<SingleScanScreen>
         ),
       ],
     );
+  }
+}
+
+class BarcodeBoxPainter extends CustomPainter {
+  final double cornerLength;
+  final double strokeWidth;
+  final Color color;
+
+  BarcodeBoxPainter({
+    this.cornerLength = 30.0,
+    this.strokeWidth = 5.0,
+    this.color = Colors.green,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+
+    // Top-left corner
+    path.moveTo(0, cornerLength);
+    path.lineTo(0, 0);
+    path.lineTo(cornerLength, 0);
+
+    // Top-right corner
+    path.moveTo(size.width - cornerLength, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width, cornerLength);
+
+    // Bottom-left corner
+    path.moveTo(0, size.height - cornerLength);
+    path.lineTo(0, size.height);
+    path.lineTo(cornerLength, size.height);
+
+    // Bottom-right corner
+    path.moveTo(size.width - cornerLength, size.height);
+    path.lineTo(size.width, size.height);
+    path.lineTo(size.width, size.height - cornerLength);
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return false;
   }
 }

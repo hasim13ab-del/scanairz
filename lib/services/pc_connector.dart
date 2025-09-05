@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scanairz/models/scan_result.dart';
 
 class PcConnector {
@@ -61,9 +60,3 @@ class PcConnector {
     disconnect();
   }
 }
-
-final pcConnectorProvider = Provider<PcConnector>((ref) {
-  final connector = PcConnector();
-  ref.onDispose(() => connector.dispose());
-  return connector;
-});

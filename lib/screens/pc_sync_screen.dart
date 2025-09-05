@@ -1,18 +1,19 @@
+
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:scanairz/providers/scanner_provider.dart';
 import 'package:scanairz/services/pc_connector.dart';
 import 'package:scanairz/services/settings_service.dart';
+import 'package:scanairz/services/storage_service.dart';
 
-class PcSyncScreen extends ConsumerStatefulWidget {
+class PcSyncScreen extends StatefulWidget {
   const PcSyncScreen({super.key});
 
   @override
-  ConsumerState<PcSyncScreen> createState() => _PcSyncScreenState();
+  State<PcSyncScreen> createState() => _PcSyncScreenState();
 }
 
-class _PcSyncScreenState extends ConsumerState<PcSyncScreen> {
+class _PcSyncScreenState extends State<PcSyncScreen> {
   final SettingsService _settingsService = SettingsService();
+  final StorageService _storageService = StorageService();
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _portController = TextEditingController();
   final List<String> _activityLog = [];
@@ -23,7 +24,7 @@ class _PcSyncScreenState extends ConsumerState<PcSyncScreen> {
   @override
   void initState() {
     super.initState();
-    _pcConnector = ref.read(pcConnectorProvider);
+    _pcConnector = PcConnector();
     _loadSettings();
     _pcConnector.connectionStatus.listen((isConnected) {
       if (mounted) {
@@ -75,7 +76,7 @@ class _PcSyncScreenState extends ConsumerState<PcSyncScreen> {
       _logActivity('Not connected. Cannot sync.');
       return;
     }
-    final scans = ref.read(scannedCodesProvider);
+    final scans = await _storageService.loadScanResults();
     if (scans.isEmpty) {
       _logActivity('No new scans to sync.');
       return;
@@ -85,7 +86,7 @@ class _PcSyncScreenState extends ConsumerState<PcSyncScreen> {
       _logActivity('Syncing ${scans.length} scans...');
       await _pcConnector.syncData(scans);
       _logActivity('Sync completed successfully.');
-      ref.read(scannedCodesProvider.notifier).clearAll(); // Optionally clear after sync
+      await _storageService.clearScanResults();
     } catch (e) {
       _logActivity('Sync failed: $e');
     }
@@ -125,7 +126,9 @@ class _PcSyncScreenState extends ConsumerState<PcSyncScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: _isConnected ? theme.colorScheme.secondary : theme.colorScheme.error,
+                color: _isConnected
+                    ? theme.colorScheme.secondary
+                    : theme.colorScheme.error,
               ),
             ),
           ],

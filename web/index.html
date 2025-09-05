@@ -33,6 +33,19 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-remote-config.js"></script>
+  <script>
+    var firebaseConfig = {
+      apiKey: "AIzaSyCm3CVafSdkGA9bZxENSWkFce7y41wHOWE",
+      authDomain: "scanairzapp.firebaseapp.com",
+      projectId: "scanairzapp",
+      storageBucket: "scanairzapp.appspot.com",
+      messagingSenderId: "920147832690",
+      appId: "1:920147832690:web:9aaa19b756e578495837eb"
+    };
+    firebase.initializeApp(firebaseConfig);
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

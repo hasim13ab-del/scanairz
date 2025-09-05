@@ -1,10 +1,11 @@
+
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:scanairz/models/batch.dart';
 import 'package:scanairz/models/scan_result.dart';
 import 'package:scanairz/services/settings_service.dart';
@@ -12,19 +13,21 @@ import 'package:scanairz/services/storage_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:vibration/vibration.dart';
 
-class BatchScanScreen extends ConsumerStatefulWidget {
+class BatchScanScreen extends StatefulWidget {
   const BatchScanScreen({super.key});
 
   @override
-  ConsumerState<BatchScanScreen> createState() => _BatchScanScreenState();
+  State<BatchScanScreen> createState() => _BatchScanScreenState();
 }
 
-class _BatchScanScreenState extends ConsumerState<BatchScanScreen>
+class _BatchScanScreenState extends State<BatchScanScreen>
     with SingleTickerProviderStateMixin {
   final List<ScanResult> _scannedBarcodes = [];
   final MobileScannerController _scannerController = MobileScannerController();
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final SettingsService _settingsService = SettingsService();
+  late SettingsService _settingsService;
+  late StorageService _storageService;
+  Future<void>? _loadSettingsFuture;
 
   late AnimationController _animationController;
 
@@ -34,19 +37,30 @@ class _BatchScanScreenState extends ConsumerState<BatchScanScreen>
   @override
   void initState() {
     super.initState();
-    _loadSettings();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loadSettingsFuture == null) {
+      _settingsService = Provider.of<SettingsService>(context, listen: false);
+      _storageService = Provider.of<StorageService>(context, listen: false);
+      _loadSettingsFuture = _loadSettings();
+    }
+  }
+
   Future<void> _loadSettings() async {
     final settings = await _settingsService.loadSettings();
-    setState(() {
-      _vibration = settings['vibration'] ?? true;
-      _laserAnimation = settings['laserAnimation'] ?? true;
-    });
+    if (mounted) {
+      setState(() {
+        _vibration = settings['vibration'] ?? true;
+        _laserAnimation = settings['laserAnimation'] ?? true;
+      });
+    }
   }
 
   @override
@@ -91,6 +105,13 @@ class _BatchScanScreenState extends ConsumerState<BatchScanScreen>
       appBar: AppBar(
         title: const Text('Batch Scan'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.flashlight_on_outlined),
+            onPressed: () {
+              _scannerController.toggleTorch();
+            },
+            tooltip: 'Torch',
+          ),
           IconButton(
             icon: const Icon(Icons.clear_all),
             onPressed: () {
@@ -137,6 +158,13 @@ class _BatchScanScreenState extends ConsumerState<BatchScanScreen>
                       );
                     },
                   ),
+                CustomPaint(
+                  painter: BarcodeBoxPainter(),
+                  child: const SizedBox(
+                    width: double.infinity,
+                    height: scanWindowSize,
+                  ),
+                )
               ],
             ),
           ),
@@ -225,12 +253,11 @@ class _BatchScanScreenState extends ConsumerState<BatchScanScreen>
                   timestamp: DateTime.now(),
                   scans: _scannedBarcodes,
                 );
-                final storageService = StorageService();
                 final messenger = ScaffoldMessenger.of(context);
                 final navigator = Navigator.of(context);
-                final batches = await storageService.loadBatches();
+                final batches = await _storageService.loadBatches();
                 batches.add(newBatch);
-                await storageService.saveBatches(batches);
+                await _storageService.saveBatches(batches);
                 setState(() {
                   _scannedBarcodes.clear();
                 });
@@ -269,21 +296,70 @@ class _BatchScanScreenState extends ConsumerState<BatchScanScreen>
     final String csv = rows.map((row) => row.join(',')).join('\n');
 
     try {
-        final Directory tempDir = await getTemporaryDirectory();
-        final String fileName = 'scanairz_batch_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-        final File file = File('${tempDir.path}/$fileName');
+      final Directory tempDir = await getTemporaryDirectory();
+      final String fileName = 'scanairz_batch_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+      final File file = File('${tempDir.path}/$fileName');
 
-        await file.writeAsString(csv);
+      await file.writeAsString(csv);
 
-        await Share.shareXFiles(
-            [XFile(file.path)],
-            subject: 'ScanAirZ Batch Export',
-            text: 'Here is the batch of scanned barcodes from ScanAirZ.',
-        );
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: 'ScanAirZ Batch Export',
+        text: 'Here is the batch of scanned barcodes from ScanAirZ.',
+      );
     } catch (e) {
-        messenger.showSnackBar(
-            SnackBar(content: Text('Error exporting batch: $e')),
-        );
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error exporting batch: $e')),
+      );
     }
+  }
+}
+
+class BarcodeBoxPainter extends CustomPainter {
+  final double cornerLength;
+  final double strokeWidth;
+  final Color color;
+
+  BarcodeBoxPainter({
+    this.cornerLength = 30.0,
+    this.strokeWidth = 5.0,
+    this.color = Colors.green,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+
+    // Top-left corner
+    path.moveTo(0, cornerLength);
+    path.lineTo(0, 0);
+    path.lineTo(cornerLength, 0);
+
+    // Top-right corner
+    path.moveTo(size.width - cornerLength, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width, cornerLength);
+
+    // Bottom-left corner
+    path.moveTo(0, size.height - cornerLength);
+    path.lineTo(0, size.height);
+    path.lineTo(cornerLength, size.height);
+
+    // Bottom-right corner
+    path.moveTo(size.width - cornerLength, size.height);
+    path.lineTo(size.width, size.height);
+    path.lineTo(size.width, size.height - cornerLength);
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return false;
   }
 }
