@@ -1,10 +1,12 @@
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 class NetworkDiscoveryService {
   bool _isDiscovering = false;
   RawDatagramSocket? _socket;
+  Timer? _discoveryTimer;
   final StreamController<List<String>> _discoveredDevicesController =
       StreamController<List<String>>.broadcast();
 
@@ -17,13 +19,15 @@ class NetworkDiscoveryService {
     _isDiscovering = true;
     final List<String> discoveredDevices = [];
     _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+    _socket!.broadcastEnabled = true;
     _socket!.listen((RawSocketEvent event) {
       if (event == RawSocketEvent.read) {
         final datagram = _socket!.receive();
         if (datagram != null) {
           final address = datagram.address.address;
-          if (!discoveredDevices.contains(address)) {
-            discoveredDevices.add(address);
+          final device = _formatDiscoveredDevice(address, datagram.data);
+          if (!discoveredDevices.contains(device)) {
+            discoveredDevices.add(device);
             _discoveredDevicesController.add(discoveredDevices);
           }
         }
@@ -31,7 +35,8 @@ class NetworkDiscoveryService {
     });
 
     // Broadcast a discovery message every 5 seconds
-    Timer.periodic(const Duration(seconds: 5), (timer) {
+    _broadcastDiscoveryMessage();
+    _discoveryTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (!_isDiscovering) {
         timer.cancel();
         return;
@@ -42,6 +47,8 @@ class NetworkDiscoveryService {
 
   void stopDiscovery() {
     _isDiscovering = false;
+    _discoveryTimer?.cancel();
+    _discoveryTimer = null;
     _socket?.close();
     _socket = null;
   }
@@ -50,6 +57,22 @@ class NetworkDiscoveryService {
     const discoveryMessage = 'scanairz_discovery';
     final data = discoveryMessage.codeUnits;
     _socket?.send(data, InternetAddress('255.255.255.255'), 8888);
+  }
+
+  String _formatDiscoveredDevice(String address, List<int> data) {
+    try {
+      final decoded = jsonDecode(utf8.decode(data));
+      if (decoded is Map && decoded['app'] == 'scanairz_pc') {
+        final port = decoded['port'];
+        if (port is int) {
+          return '$address:$port';
+        }
+      }
+    } catch (_) {
+      // Older companion responses may be plain packets; the sender IP is enough.
+    }
+
+    return address;
   }
 
   void dispose() {

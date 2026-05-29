@@ -35,9 +35,20 @@ class ScanResult {
     );
   }
 
-  String toJson() => json.encode(toMap());
+  Map<String, dynamic> toJson() => toMap();
 
-  factory ScanResult.fromJson(String source) => ScanResult.fromMap(json.decode(source));
+  factory ScanResult.fromJson(dynamic source) {
+    if (source is Map<String, dynamic>) {
+      return ScanResult.fromMap(source);
+    }
+    if (source is Map) {
+      return ScanResult.fromMap(Map<String, dynamic>.from(source));
+    }
+    if (source is String) {
+      return ScanResult.fromJson(jsonDecode(source));
+    }
+    throw ArgumentError('Invalid scan result JSON: $source');
+  }
 
   factory ScanResult.fromData(String barcodeData, String format) {
     return ScanResult(

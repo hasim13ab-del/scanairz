@@ -17,7 +17,11 @@ class StorageService {
   Future<List<ScanResult>> loadScanResults() async {
     final prefs = await SharedPreferences.getInstance();
     final encoded = prefs.getStringList(_scanHistoryKey) ?? [];
-    return encoded.map((e) => ScanResult.fromJson(jsonDecode(e))).toList();
+    return encoded.map((e) {
+      final decoded = jsonDecode(e);
+      final scanJson = decoded is String ? jsonDecode(decoded) : decoded;
+      return ScanResult.fromJson(scanJson);
+    }).toList();
   }
 
   Future<void> removeScanResult(ScanResult result) async {

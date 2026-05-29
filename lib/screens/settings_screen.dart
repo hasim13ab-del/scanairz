@@ -19,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsService _settingsService = SettingsService();
   final NetworkDiscoveryService _networkDiscoveryService =
       NetworkDiscoveryService();
+  late Future<void> _settingsFuture;
 
   // PC Connection
   String _connectionMethod = 'Wi-Fi';
@@ -42,11 +43,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _settingsFuture = _loadSettings();
     _networkDiscoveryService.discoveredDevices.listen((devices) {
-      setState(() {
-        _discoveredDevices = devices;
-      });
+      if (mounted) {
+        setState(() {
+          _discoveredDevices = devices;
+        });
+      }
     });
+  }
+
+  Future<void> _loadSettings() async {
+    final settings = await _settingsService.loadSettings();
+    _connectionMethod = settings['connectionMethod'] ?? 'Wi-Fi';
+    _ipAddressController.text = settings['ipAddress'] ?? '';
+    _portController.text = settings['port'] ?? '';
+    _continuousScan = settings['continuousScan'] ?? false;
+    _vibration = settings['vibration'] ?? true;
+    _laserAnimation = settings['laserAnimation'] ?? true;
+    _saveHistory = settings['saveHistory'] ?? true;
+    _autoClearHistoryDays = settings['autoClearHistoryDays'] ?? 7;
+    _theme = settings['theme'] ?? 'System';
   }
 
   @override
@@ -63,25 +80,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         title: const Text('Settings'),
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _settingsService.loadSettings(),
+      body: FutureBuilder<void>(
+        future: _settingsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return const Center(child: Text('Error loading settings'));
           } else {
-            final settings = snapshot.data!;
-            _connectionMethod = settings['connectionMethod']!;
-            _ipAddressController.text = settings['ipAddress']!;
-            _portController.text = settings['port']!;
-            _continuousScan = settings['continuousScan']!;
-            _vibration = settings['vibration']!;
-            _laserAnimation = settings['laserAnimation']!;
-            _saveHistory = settings['saveHistory']!;
-            _autoClearHistoryDays = settings['autoClearHistoryDays']!;
-            _theme = settings['theme'] ?? 'System';
-
             return ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
@@ -126,7 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          value: _connectionMethod,
+          initialValue: _connectionMethod,
           decoration: const InputDecoration(
             labelText: 'Connection Method',
             border: OutlineInputBorder(),
@@ -177,8 +183,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   return ListTile(
                     title: Text(deviceIp),
                     onTap: () {
+                      final parts = deviceIp.split(':');
                       setState(() {
-                        _ipAddressController.text = deviceIp;
+                        _ipAddressController.text = parts.first;
+                        if (parts.length > 1) {
+                          _portController.text = parts.last;
+                        }
                       });
                     },
                   );
@@ -193,7 +203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               hintText: '192.168.1.100',
               border: OutlineInputBorder(),
             ),
-            keyboardType: TextInputType.number,
+            keyboardType: TextInputType.text,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -270,7 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildThemeSettings() {
     return DropdownButtonFormField<String>(
-      value: _theme,
+      initialValue: _theme,
       decoration: const InputDecoration(
         labelText: 'Theme',
         border: OutlineInputBorder(),

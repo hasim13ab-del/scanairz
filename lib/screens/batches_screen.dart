@@ -100,7 +100,11 @@ class _BatchesScreenState extends State<BatchesScreen> {
               child: const Text('Delete', style: TextStyle(color: Colors.red)),
               onPressed: () async {
                 final batches = await _storageService.loadBatches();
-                batches.removeWhere((b) => b.name == batch.name);
+                batches.removeWhere(
+                  (b) =>
+                      b.name == batch.name &&
+                      b.timestamp == batch.timestamp,
+                );
                 await _storageService.saveBatches(batches);
                 _refreshBatches();
                 if (context.mounted) Navigator.of(context).pop();

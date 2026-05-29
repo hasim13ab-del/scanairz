@@ -27,7 +27,6 @@ gen/
 
 # Web-specific files
 .dart_tool/
-lib/generated_plugin_registrant.dart
 
 # Mobile-specific files
 android/app/src/main/assets/flutter_assets/

@@ -29,6 +29,8 @@ dependencies:
   url_launcher: ^6.1.14
   firebase_core: ^2.27.2
   firebase_remote_config: ^4.3.20
+  flutter_bluetooth_serial: ^0.4.0
+  usb_serial: ^0.5.2
 
 dev_dependencies:
   flutter_test:

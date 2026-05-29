@@ -1,5 +1,7 @@
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:scanairz/services/pc_connector.dart';
 import 'package:scanairz/services/settings_service.dart';
 import 'package:scanairz/services/storage_service.dart';
@@ -12,34 +14,52 @@ class PcSyncScreen extends StatefulWidget {
 }
 
 class _PcSyncScreenState extends State<PcSyncScreen> {
-  final SettingsService _settingsService = SettingsService();
-  final StorageService _storageService = StorageService();
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _portController = TextEditingController();
   final List<String> _activityLog = [];
 
+  late SettingsService _settingsService;
+  late StorageService _storageService;
   late PcConnector _pcConnector;
+  StreamSubscription<bool>? _connectionSubscription;
   bool _isConnected = false;
+  bool _settingsLoaded = false;
 
   @override
-  void initState() {
-    super.initState();
-    _pcConnector = PcConnector();
-    _loadSettings();
-    _pcConnector.connectionStatus.listen((isConnected) {
-      if (mounted) {
-        setState(() {
-          _isConnected = isConnected;
-          _logActivity(isConnected ? 'Connected to PC' : 'Disconnected from PC');
-        });
-      }
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _settingsService = Provider.of<SettingsService>(context, listen: false);
+    _storageService = Provider.of<StorageService>(context, listen: false);
+    _pcConnector = Provider.of<PcConnector>(context, listen: false);
+    _isConnected = _pcConnector.isConnected;
+
+    _connectionSubscription ??=
+        _pcConnector.connectionStatus.listen(_handleConnectionChanged);
+
+    if (!_settingsLoaded) {
+      _settingsLoaded = true;
+      _loadSettings();
+    }
   }
 
   Future<void> _loadSettings() async {
     final settings = await _settingsService.loadSettings();
-    _ipController.text = settings['ipAddress'] ?? '';
-    _portController.text = settings['port'] ?? '';
+    if (!mounted) return;
+    setState(() {
+      _ipController.text = settings['ipAddress'] ?? '';
+      _portController.text = settings['port'] ?? '8765';
+    });
+  }
+
+  void _handleConnectionChanged(bool isConnected) {
+    if (!mounted) return;
+    setState(() {
+      _isConnected = isConnected;
+      _activityLog.insert(
+        0,
+        '${DateTime.now().toLocal()}: ${isConnected ? 'Connected to PC' : 'Disconnected from PC'}',
+      );
+    });
   }
 
   void _logActivity(String message) {
@@ -53,6 +73,7 @@ class _PcSyncScreenState extends State<PcSyncScreen> {
       _logActivity('IP address and port cannot be empty.');
       return;
     }
+
     final ip = _ipController.text;
     final port = int.tryParse(_portController.text);
     if (port == null) {
@@ -76,6 +97,7 @@ class _PcSyncScreenState extends State<PcSyncScreen> {
       _logActivity('Not connected. Cannot sync.');
       return;
     }
+
     final scans = await _storageService.loadScanResults();
     if (scans.isEmpty) {
       _logActivity('No new scans to sync.');
@@ -90,6 +112,14 @@ class _PcSyncScreenState extends State<PcSyncScreen> {
     } catch (e) {
       _logActivity('Sync failed: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _connectionSubscription?.cancel();
+    _ipController.dispose();
+    _portController.dispose();
+    super.dispose();
   }
 
   @override
@@ -144,7 +174,7 @@ class _PcSyncScreenState extends State<PcSyncScreen> {
         TextField(
           controller: _ipController,
           decoration: const InputDecoration(labelText: 'PC IP Address'),
-          keyboardType: TextInputType.number,
+          keyboardType: TextInputType.text,
         ),
         const SizedBox(height: 10),
         TextField(
@@ -197,7 +227,9 @@ class _PcSyncScreenState extends State<PcSyncScreen> {
                 itemBuilder: (context, index) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(
-                        vertical: 4.0, horizontal: 8.0),
+                      vertical: 4.0,
+                      horizontal: 8.0,
+                    ),
                     child: Text(_activityLog[index]),
                   );
                 },

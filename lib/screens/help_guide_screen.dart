@@ -1,7 +1,5 @@
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 class HelpGuideScreen extends StatelessWidget {
   const HelpGuideScreen({super.key});
 
@@ -14,14 +12,16 @@ class HelpGuideScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          const Text(
-            'Welcome to our Help & Guide center. Here you can find resources to help you get the most out of ScanAiRZ.',
-            style: TextStyle(fontSize: 16.0),
-          ),
-          const SizedBox(height: 20.0),
-          _buildSectionTitle('Tutorial Video'),
+          _buildSectionTitle('Scanning'),
           const SizedBox(height: 10.0),
-          _buildVideoPlayer(context, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'), // Replace with your actual video URL
+          _buildFAQ(
+            'How do I scan one item?',
+            'Open Single Scan, point the camera at a barcode, and keep the code inside the frame until it is detected.',
+          ),
+          _buildFAQ(
+            'How do I scan many items?',
+            'Open Batch Scan to collect multiple barcode scans, then save the batch or export it as a CSV file.',
+          ),
           const SizedBox(height: 20.0),
           _buildSectionTitle('Frequently Asked Questions'),
           const SizedBox(height: 10.0),
@@ -30,8 +30,12 @@ class HelpGuideScreen extends StatelessWidget {
             'You can connect your device to your PC via Wi-Fi, Bluetooth, or USB. Visit the PC Sync screen for more details.',
           ),
           _buildFAQ(
-            'How do I start a batch scan?',
-            'From the main screen, tap on the \'Batch Scan\' option. You can then start scanning multiple items, and they will be added to a list.',
+            'Where are my scans stored?',
+            'Saved scans are stored on this device. Open History to search, share, export, or clear them.',
+          ),
+          _buildFAQ(
+            'Can I change scan behavior?',
+            'Open Settings to turn continuous scan, vibration, laser animation, and history saving on or off.',
           ),
         ],
       ),
@@ -42,43 +46,6 @@ class HelpGuideScreen extends StatelessWidget {
     return Text(
       title,
       style: const TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
-    );
-  }
-
-  Widget _buildVideoPlayer(BuildContext context, String url) {
-    return GestureDetector(
-      onTap: () async {
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
-        } else {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Could not launch video')),
-            );
-          }
-        }
-      },
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(8.0),
-            image: const DecorationImage(
-              image: NetworkImage('https://img.youtube.com/vi/dQw4w9WgXcQ/0.jpg'), // Fetches the video thumbnail
-              fit: BoxFit.cover,
-            ),
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.play_circle_fill,
-              color: Colors.white,
-              size: 60.0,
-            ),
-          ),
-        ),
-      ),
     );
   }
 

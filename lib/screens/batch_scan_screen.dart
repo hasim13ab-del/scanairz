@@ -1,6 +1,7 @@
 
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -251,7 +252,7 @@ class _BatchScanScreenState extends State<BatchScanScreen>
                 final newBatch = Batch(
                   name: batchNameController.text,
                   timestamp: DateTime.now(),
-                  scans: _scannedBarcodes,
+                  scans: List<ScanResult>.from(_scannedBarcodes),
                 );
                 final messenger = ScaffoldMessenger.of(context);
                 final navigator = Navigator.of(context);
@@ -293,7 +294,7 @@ class _BatchScanScreenState extends State<BatchScanScreen>
       ]);
     }
 
-    final String csv = rows.map((row) => row.join(',')).join('\n');
+    final String csv = const ListToCsvConverter().convert(rows);
 
     try {
       final Directory tempDir = await getTemporaryDirectory();

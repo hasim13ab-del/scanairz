@@ -46,7 +46,7 @@ class SettingsService {
     return {
       'connectionMethod': prefs.getString(_connectionMethodKey) ?? 'Wi-Fi',
       'ipAddress': prefs.getString(_ipAddressKey) ?? '',
-      'port': prefs.getString(_portKey) ?? '',
+      'port': prefs.getString(_portKey) ?? '8765',
       'continuousScan': prefs.getBool(_continuousScanKey) ?? false,
       'vibration': prefs.getBool(_vibrationKey) ?? true,
       'laserAnimation': prefs.getBool(_laserAnimationKey) ?? true,

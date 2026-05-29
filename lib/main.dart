@@ -8,9 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:scanairz/screens/batches_screen.dart';
 import 'package:scanairz/screens/history_screen.dart';
 import 'package:scanairz/screens/main_scan_screen.dart';
-import 'package:scanairz/screens/pc_sync_screen.dart';
+import 'package:scanairz/screens/pc_connection_screen.dart';
 import 'package:scanairz/screens/settings_screen.dart';
 import 'package:scanairz/services/settings_service.dart';
+import 'package:scanairz/services/permission_service.dart';
 import 'package:scanairz/theme_notifier.dart';
 import 'package:scanairz/themes.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -25,6 +26,7 @@ Future<void> main() async {
   final settingsService = SettingsService();
   final storageService = StorageService();
   final pcConnector = PcConnector();
+  final permissionService = PermissionService();
 
   runApp(
     MultiProvider(
@@ -33,6 +35,7 @@ Future<void> main() async {
         Provider<SettingsService>.value(value: settingsService),
         Provider<StorageService>.value(value: storageService),
         Provider<PcConnector>.value(value: pcConnector),
+        Provider<PermissionService>.value(value: permissionService),
       ],
       child: AiRZApp(onboardingComplete: onboardingComplete),
     ),
@@ -117,7 +120,7 @@ class _MainScreenState extends State<MainScreen> {
     MainScanScreen(),
     HistoryScreen(),
     BatchesScreen(),
-    PcSyncScreen(),
+    PcConnectionScreen(),
     SettingsScreen(),
   ];
 

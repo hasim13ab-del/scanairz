@@ -43,7 +43,7 @@ class ContactUsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               ElevatedButton.icon(
-                onPressed: _launchEmail,
+                onPressed: () => _launchEmail(context),
                 icon: const Icon(Icons.email),
                 label: const Text('Contact Support'),
               ),
@@ -54,17 +54,23 @@ class ContactUsScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _launchEmail() async {
+  Future<void> _launchEmail(BuildContext context) async {
     final Uri emailLaunchUri = Uri(
       scheme: 'mailto',
       path: 'support@airz.com',
-      query: 'subject=ScanAiRZ App Support Request',
+      queryParameters: {
+        'subject': 'ScanAiRZ App Support Request',
+      },
     );
 
     if (await canLaunchUrl(emailLaunchUri)) {
       await launchUrl(emailLaunchUri);
     } else {
-      throw 'Could not launch $emailLaunchUri';
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open email app.')),
+        );
+      }
     }
   }
 }

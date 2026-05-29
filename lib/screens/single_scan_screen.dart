@@ -29,6 +29,7 @@ class _SingleScanScreenState extends State<SingleScanScreen>
   bool _vibration = true;
   bool _laserAnimation = true;
   bool _saveHistory = true;
+  bool _isHandlingScan = false;
 
   @override
   void initState() {
@@ -148,10 +149,16 @@ class _SingleScanScreenState extends State<SingleScanScreen>
   }
 
   void _onBarcodeDetect(Barcode barcode) async {
+    if (_isHandlingScan) {
+      return;
+    }
+
     final scanResult = barcode.rawValue;
     if (scanResult == null) {
       return;
     }
+
+    _isHandlingScan = true;
 
     if (_vibration) {
       Vibration.vibrate(duration: 100);
@@ -170,7 +177,17 @@ class _SingleScanScreenState extends State<SingleScanScreen>
       await _storageService.saveHistory(history);
     }
 
-    await _pcConnector.syncData([newScan]);
+    if (_pcConnector.isConnected) {
+      try {
+        await _pcConnector.syncData([newScan]);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('PC sync failed: $e')),
+          );
+        }
+      }
+    }
 
     if (!_continuousScan) {
       _scannerController.stop();
@@ -186,7 +203,12 @@ class _SingleScanScreenState extends State<SingleScanScreen>
             backgroundColor: Colors.transparent,
             child: _buildDialogContent(context, scanResult),
           ),
-        ).then((_) => _scannerController.start());
+        ).then((_) {
+          _isHandlingScan = false;
+          if (mounted) {
+            _scannerController.start();
+          }
+        });
       }
     } else {
       if (mounted) {
@@ -194,6 +216,7 @@ class _SingleScanScreenState extends State<SingleScanScreen>
           SnackBar(content: Text('Scanned: $scanResult')),
         );
       }
+      _isHandlingScan = false;
     }
   }
 

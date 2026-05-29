@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -35,7 +36,7 @@ class _BatchDetailsScreenState extends State<BatchDetailsScreen> {
       ]);
     }
 
-    String csv = rows.map((row) => row.join(',')).join('\n');
+    final String csv = const ListToCsvConverter().convert(rows);
 
     try {
       final Directory tempDir = await getTemporaryDirectory();
