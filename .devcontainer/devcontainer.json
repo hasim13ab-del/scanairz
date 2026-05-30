@@ -1,0 +1,25 @@
+{
+    "name": "My Development Environment",
+    "image": "mcr.microsoft.com/devcontainers/universal:2",
+    
+    // Add tools like Git or Docker if you need them
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {}
+    },
+
+    // Customize the environment with extensions and settings
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",        // For Python development
+                "ms-azuretools.vscode-docker" // To manage Docker containers
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash"
+            }
+        }
+    },
+
+    // Command to run after the container is created (e.g., installing requirements)
+    "postCreateCommand": "pip install --user -r requirements.txt || echo 'No requirements.txt found'"
+}
