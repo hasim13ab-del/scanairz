@@ -1,0 +1,22 @@
+Name: scanairz_pc_gui
+Description: A graphical user interface version of the PC companion for ScanAiRZ
+Version: 0.1.0
+Publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  fluttertoast: ^8.2.4
+  provider: ^6.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true

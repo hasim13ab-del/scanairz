@@ -95,3 +95,4 @@ linux/my_application
 # Generated files
 *.g.dart
 *.freezed.dart
+.opencode

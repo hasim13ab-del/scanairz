@@ -1,55 +1,44 @@
-name: Build Flutter APKs
+name: Build ScanAiRZ Applications
 
 on:
   push:
-    branches:
-      - main  # Trigger on push to main branch
-  workflow_dispatch: {}  # Optional: allow manual trigger
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # 1️⃣ Checkout code
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      # 2️⃣ Set up JDK
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          java-version: 17
-          distribution: temurin
-
-      # 3️⃣ Set up Flutter
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.16.x"  # Adjust if needed
-
-      # 4️⃣ Install dependencies
-      - name: Install Flutter dependencies
-        run: flutter pub get
-
-      # 5️⃣ Build Release APK
-      - name: Build Release APK
-        run: flutter build apk --release
-
-      # 6️⃣ Upload Release APK
-      - name: Upload Release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-
-      # 7️⃣ Build Debug APK
-      - name: Build Debug APK
-        run: flutter build apk --debug
-
-      # 8️⃣ Upload Debug APK
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+    - uses: actions/checkout@v3
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        cache: true
+        
+    - name: Setup Dependencies
+      run: |
+        flutter pub get
+        
+    - name: Build Android APK
+      run: |
+        flutter build apk --release
+        
+    - name: Build Desktop Apps
+      run: |
+        flutter build linux --release
+        flutter build macos --release
+        flutter build windows --release
+        
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: scanairz-apps
+        path: |
+          build/app/outputs/flutter-apk/app-release.apk
+          build/linux/x64/release/bundle/
+          build/macos/Release/
+          build/windows/Release/
