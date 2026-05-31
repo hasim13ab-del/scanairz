@@ -23,9 +23,9 @@ jobs:
       run: |
         flutter pub get
         
-     - name: Build Android APK
-       run: |
-         flutter build apk --debug
+    - name: Build Android APK
+      run: |
+        flutter build apk --debug
         
     - name: Build Desktop Apps
       run: |
