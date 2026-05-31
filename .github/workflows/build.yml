@@ -29,6 +29,21 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Fix plugin namespaces (AGP 8+ compatibility)
+        run: |
+          find $HOME/.pub-cache -name "build.gradle" -path "*/android/build.gradle" | while read f; do
+            if grep -q "com.android.library" "$f" && ! grep -q "namespace" "$f"; then
+              MANIFEST="$(dirname "$f")/src/main/AndroidManifest.xml"
+              if [ -f "$MANIFEST" ]; then
+                PKG=$(grep -oP 'package="\K[^"]+' "$MANIFEST" || true)
+                if [ -n "$PKG" ]; then
+                  sed -i "s/android {/android {\n    namespace '$PKG'/" "$f"
+                  echo "Patched: $f  =>  namespace '$PKG'"
+                fi
+              fi
+            fi
+          done
+
       - name: Build Android APK (debug)
         run: flutter build apk --debug
 
@@ -37,31 +52,3 @@ jobs:
         with:
           name: android-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
-
-  build-windows:
-    name: Build Windows EXE
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-
-      - name: Enable Windows desktop
-        run: flutter config --enable-windows-desktop
-
-      - name: Get dependencies
-        run: flutter pub get
-
-      - name: Build Windows
-        run: flutter build windows --release
-
-      - name: Upload Windows build
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-exe
-          path: build/windows/x64/runner/Release/
