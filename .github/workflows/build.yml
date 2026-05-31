@@ -7,38 +7,61 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.44.0'
-        cache: true
-        
-    - name: Setup Dependencies
-      run: |
-        flutter pub get
-        
-    - name: Build Android APK
-      run: |
-        flutter build apk --debug
-        
-    - name: Build Desktop Apps
-      run: |
-        flutter build linux --release
-        flutter build macos --release
-        flutter build windows --release
-        
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: scanairz-apps
-        path: |
-          build/app/outputs/flutter-apk/app-debug.apk
-          build/linux/x64/release/bundle/
-          build/macos/Release/
-          build/windows/Release/
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Android APK (debug)
+        run: flutter build apk --debug
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows
+        run: flutter build windows --release
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: build/windows/x64/runner/Release/
