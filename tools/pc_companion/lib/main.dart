@@ -26,8 +26,8 @@ Future<void> main() async {
   await windowManager.ensureInitialized();
   await windowManager.waitUntilReadyToShow(
     const WindowOptions(
-      size:        Size(960, 680),
-      minimumSize: Size(720, 520),
+      size:        Size(960, 720),
+      minimumSize: Size(800, 600),
       title:       'ScanAiRZ PC Companion',
       center:      true,
       backgroundColor: Colors.transparent,
@@ -79,7 +79,7 @@ class DashboardPage extends StatefulWidget {
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class _DashboardPageState extends State<DashboardPage> with SingleTickerProviderStateMixin {
   // Server state
   ServerSocket?    _server;
   RawDatagramSocket? _udpSocket;
@@ -96,11 +96,13 @@ class _DashboardPageState extends State<DashboardPage> {
   final _portController = TextEditingController(text: '8765');
   final _logScrollCtrl  = ScrollController();
   final _scanScrollCtrl = ScrollController();
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _fetchLocalIps();
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   Future<void> _fetchLocalIps() async {
@@ -238,6 +240,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _portController.dispose();
     _logScrollCtrl.dispose();
     _scanScrollCtrl.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -252,21 +255,38 @@ class _DashboardPageState extends State<DashboardPage> {
             onStart:      _startServer,
             onStop:       _stopServer,
           ),
+          TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(icon: Icon(Icons.wifi), text: 'WiFi'),
+              Tab(icon: Icon(Icons.bluetooth), text: 'Bluetooth'),
+              Tab(icon: Icon(Icons.usb), text: 'USB'),
+            ],
+            indicatorColor: const Color(0xFF00ACC1),
+            labelColor: const Color(0xFF00ACC1),
+          ),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Left sidebar ──────────────────────────────────────────
                 SizedBox(
-                  width: 260,
-                  child: _Sidebar(
-                    running:        _running,
-                    localIps:       _localIps,
-                    port:           _port,
-                    typeIntoApp:    _typeIntoApp,
-                    portController: _portController,
-                    onTypeToggle:   (v) => setState(() => _typeIntoApp = v),
-                    onClearScans:   () => setState(() => _barcodes.clear()),
+                  width: 280,
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _WiFiSidebar(
+                        running:        _running,
+                        localIps:       _localIps,
+                        port:           _port,
+                        typeIntoApp:    _typeIntoApp,
+                        portController: _portController,
+                        onTypeToggle:   (v) => setState(() => _typeIntoApp = v),
+                        onClearScans:   () => setState(() => _barcodes.clear()),
+                      ),
+                      const _BluetoothSidebar(),
+                      const _UsbSidebar(),
+                    ],
                   ),
                 ),
                 const VerticalDivider(width: 1, thickness: 1, color: Color(0xFF243455)),
@@ -314,14 +334,14 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 56,
+      height: 64,
       color: const Color(0xFF0A0E1A),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          const Icon(Icons.qr_code_scanner, color: Color(0xFF00ACC1), size: 22),
-          const SizedBox(width: 10),
-          const Text('ScanAiRZ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          Image.asset('assets/logo.png', height: 32, errorBuilder: (_, __, ___) => const Icon(Icons.qr_code_scanner, color: Color(0xFF00ACC1), size: 32)),
+          const SizedBox(width: 12),
+          const Text('ScanAiRZ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
           const Text(' PC Companion', style: TextStyle(fontSize: 14, color: Color(0xFF90A4AE))),
           const Spacer(),
           if (running && connCount > 0)
@@ -350,7 +370,7 @@ class _TopBar extends StatelessWidget {
               backgroundColor: running ? const Color(0xFFEF5350) : const Color(0xFF00ACC1),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             ),
           ),
         ],
@@ -359,8 +379,8 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// ── Left sidebar ──────────────────────────────────────────────────────────────
-class _Sidebar extends StatelessWidget {
+// ── Left sidebars ──────────────────────────────────────────────────────────────
+class _WiFiSidebar extends StatelessWidget {
   final bool running;
   final List<String> localIps;
   final int port;
@@ -369,7 +389,7 @@ class _Sidebar extends StatelessWidget {
   final ValueChanged<bool> onTypeToggle;
   final VoidCallback onClearScans;
 
-  const _Sidebar({
+  const _WiFiSidebar({
     required this.running,
     required this.localIps,
     required this.port,
@@ -411,7 +431,7 @@ class _Sidebar extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    running ? 'Listening' : 'Stopped',
+                    running ? 'WiFi Listening' : 'WiFi Stopped',
                     style: TextStyle(
                       color: running ? const Color(0xFF26C6DA) : Colors.grey,
                       fontWeight: FontWeight.bold, fontSize: 15,
@@ -463,11 +483,6 @@ class _Sidebar extends StatelessWidget {
               value:   typeIntoApp,
               onChanged: onTypeToggle,
             ),
-            const SizedBox(height: 6),
-            const Text(
-              'When ON, each scan is automatically typed into whichever field is focused on your PC.',
-              style: TextStyle(color: Color(0xFF546E7A), fontSize: 11, height: 1.4),
-            ),
             const SizedBox(height: 20),
 
             // Clear button
@@ -482,6 +497,60 @@ class _Sidebar extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BluetoothSidebar extends StatelessWidget {
+  const _BluetoothSidebar();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0D1520),
+      padding: const EdgeInsets.all(20),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.bluetooth, size: 48, color: Colors.blue),
+          SizedBox(height: 16),
+          Text('Bluetooth Connectivity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          SizedBox(height: 12),
+          Text(
+            'To connect via Bluetooth, pair your phone with this PC as a standard Bluetooth Serial device. The app will automatically detect incoming data from paired devices.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
+          ),
+          SizedBox(height: 20),
+          Text('Status: Ready to Pair', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
+
+class _UsbSidebar extends StatelessWidget {
+  const _UsbSidebar();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0D1520),
+      padding: const EdgeInsets.all(20),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.usb, size: 48, color: Colors.orange),
+          SizedBox(height: 16),
+          Text('USB Connectivity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          SizedBox(height: 12),
+          Text(
+            'Connect your phone via USB cable and ensure "USB Debugging" or "File Transfer" mode is enabled. The app monitors available COM ports for scan data.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
+          ),
+          SizedBox(height: 20),
+          Text('Status: Monitoring Ports', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
