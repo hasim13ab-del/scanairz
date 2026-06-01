@@ -19,42 +19,25 @@ class MainScanScreen extends StatelessWidget {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 140,
+            expandedHeight: 160,
             floating: false,
             pinned: true,
             backgroundColor: const Color(0xFF1A2744),
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
               title: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00ACC1).withAlpha(40),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.qr_code_scanner,
-                      color: Color(0xFF00ACC1),
-                      size: 20,
-                    ),
-                  ),
+                  Image.asset('assets/app_icon.png', height: 24, errorBuilder: (_,__,___) => const Icon(Icons.qr_code_scanner, color: Color(0xFF00ACC1), size: 24)),
                   const SizedBox(width: 10),
-                  const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ScanAiRZ',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    'ScanAiRZ',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ],
               ),
@@ -66,53 +49,29 @@ class MainScanScreen extends StatelessWidget {
                     colors: [Color(0xFF0A0E1A), Color(0xFF1A2744), Color(0xFF243455)],
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 60, 20, 0),
+                child: Center(
                   child: Consumer<PcConnector>(
                     builder: (context, pc, _) {
-                      return Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: pc.isConnected
-                                  ? const Color(0xFF00ACC1).withAlpha(30)
-                                  : Colors.white.withAlpha(15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: pc.isConnected
-                                    ? const Color(0xFF00ACC1).withAlpha(100)
-                                    : Colors.white.withAlpha(40),
-                              ),
+                      return Container(
+                        margin: const EdgeInsets.only(top: 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: pc.isConnected ? Colors.green.withAlpha(40) : Colors.white10,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: pc.isConnected ? Colors.green.withAlpha(100) : Colors.white24),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(pc.isConnected ? Icons.check_circle : Icons.error_outline, 
+                                 color: pc.isConnected ? Colors.greenAccent : Colors.white60, size: 14),
+                            const SizedBox(width: 8),
+                            Text(
+                              pc.isConnected ? 'Connected to PC' : 'Offline Mode',
+                              style: TextStyle(color: pc.isConnected ? Colors.greenAccent : Colors.white60, fontSize: 12, fontWeight: FontWeight.bold),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: pc.isConnected ? const Color(0xFF00ACC1) : Colors.grey,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  pc.isConnected
-                                      ? 'PC Connected'
-                                      : 'PC Not Connected',
-                                  style: TextStyle(
-                                    color: pc.isConnected
-                                        ? const Color(0xFF26C6DA)
-                                        : Colors.white60,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       );
                     },
                   ),
@@ -128,81 +87,64 @@ class MainScanScreen extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   );
                 },
-                tooltip: 'Settings',
               ),
             ],
           ),
 
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
             sliver: SliverToBoxAdapter(
               child: Text(
-                'Scan Mode',
+                'QUICK SCAN MODES',
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white54 : const Color(0xFF546E7A),
-                  letterSpacing: 1.2,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white38 : Colors.grey.shade600,
+                  letterSpacing: 1.5,
                 ),
               ),
             ),
           ),
 
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                mainAxisSpacing: 14,
-                crossAxisSpacing: 14,
-                childAspectRatio: 1.0,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 0.95,
               ),
               delegate: SliverChildListDelegate([
                 _ScanCard(
                   icon: Icons.qr_code_scanner,
                   label: 'Single Scan',
-                  subtitle: 'Scan one item at a time',
-                  gradientColors: const [Color(0xFF1A2744), Color(0xFF243455)],
-                  accentColor: const Color(0xFF00ACC1),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SingleScanScreen()),
-                  ),
+                  subtitle: 'One by one',
+                  color: const Color(0xFF00ACC1),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SingleScanScreen())),
                 ),
                 _ScanCard(
                   icon: Icons.inventory_2_rounded,
                   label: 'Batch Scan',
-                  subtitle: 'Scan multiple items fast',
-                  gradientColors: const [Color(0xFF7B3F00), Color(0xFFF57C00)],
-                  accentColor: const Color(0xFFFF9800),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const BatchScanScreen()),
-                  ),
+                  subtitle: 'Continuous',
+                  color: const Color(0xFFF57C00),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BatchScanScreen())),
                 ),
               ]),
             ),
           ),
 
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
             sliver: SliverToBoxAdapter(
-              child: _ScanCard(
+              child: _SupportCard(
                 icon: Icons.help_outline_rounded,
-                label: 'Help & Guide',
-                subtitle: 'Learn how to use ScanAiRZ',
-                gradientColors: const [Color(0xFF0A3D5C), Color(0xFF0D5C8A)],
-                accentColor: const Color(0xFF29B6F6),
-                tall: false,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HelpGuideScreen()),
-                ),
+                title: 'Help & User Guide',
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpGuideScreen())),
               ),
             ),
           ),
-
-          const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
+          const SliverPadding(padding: EdgeInsets.only(bottom: 40)),
         ],
       ),
     );
@@ -213,120 +155,57 @@ class _ScanCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String subtitle;
-  final List<Color> gradientColors;
-  final Color accentColor;
+  final Color color;
   final VoidCallback onTap;
-  final bool tall;
 
-  const _ScanCard({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.gradientColors,
-    required this.accentColor,
-    required this.onTap,
-    this.tall = true,
-  });
+  const _ScanCard({required this.icon, required this.label, required this.subtitle, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(20),
+      color: color.withAlpha(20),
+      borderRadius: BorderRadius.circular(24),
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradientColors,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: gradientColors.last.withAlpha(80),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: color.withAlpha(60), width: 2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 36),
+              const SizedBox(height: 16),
+              Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 4),
+              Text(subtitle, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
             ],
           ),
-          child: tall
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: accentColor.withAlpha(40),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, color: accentColor, size: 28),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          label,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: Colors.white.withAlpha(170),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                )
-              : Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: accentColor.withAlpha(40),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, color: accentColor, size: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          label,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: Colors.white.withAlpha(170),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Icon(Icons.arrow_forward_ios, color: accentColor, size: 16),
-                  ],
-                ),
         ),
       ),
+    );
+  }
+}
+
+class _SupportCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+  const _SupportCard({required this.icon, required this.title, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      tileColor: Colors.black12,
+      leading: Icon(icon, color: const Color(0xFF00ACC1)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: const Icon(Icons.chevron_right, size: 20),
     );
   }
 }
