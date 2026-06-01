@@ -99,26 +99,26 @@ jobs:
             --platforms=windows \
             --org=com.airz \
             --project-name=scanairz_companion \
-            /tmp/companion_build
+            ${{ runner.temp }}/companion_build
 
       - name: Copy custom source into project
         shell: bash
         run: |
-          cp tools/pc_companion_source/lib/main.dart /tmp/companion_build/lib/main.dart
-          cp tools/pc_companion_source/pubspec.yaml  /tmp/companion_build/pubspec.yaml
+          cp tools/pc_companion_source/lib/main.dart ${{ runner.temp }}/companion_build/lib/main.dart
+          cp tools/pc_companion_source/pubspec.yaml  ${{ runner.temp }}/companion_build/pubspec.yaml
 
       - name: Get companion dependencies
-        working-directory: /tmp/companion_build
+        working-directory: ${{ runner.temp }}/companion_build
         run: flutter pub get
 
       - name: Build companion release
-        working-directory: /tmp/companion_build
+        working-directory: ${{ runner.temp }}/companion_build
         run: flutter build windows --release
 
       - name: Package companion as zip
         shell: pwsh
         run: |
-          $src = "/tmp/companion_build/build/windows/x64/runner/Release"
+          $src = "${{ runner.temp }}/companion_build/build/windows/x64/runner/Release"
           Compress-Archive -Path "$src\*" -DestinationPath "scanairz-pc-companion.zip" -Force
 
       - name: Upload PC Companion
