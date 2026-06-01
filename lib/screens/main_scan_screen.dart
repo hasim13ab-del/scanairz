@@ -5,7 +5,6 @@ import 'package:scanairz/screens/help_guide_screen.dart';
 import 'package:scanairz/screens/settings_screen.dart';
 import 'package:scanairz/screens/single_scan_screen.dart';
 import 'package:scanairz/services/pc_connector.dart';
-import 'package:scanairz/services/remote_config_service.dart';
 
 class MainScanScreen extends StatelessWidget {
   const MainScanScreen({super.key});
@@ -185,27 +184,22 @@ class MainScanScreen extends StatelessWidget {
             ),
           ),
 
-          Consumer<RemoteConfigService>(
-            builder: (context, remoteConfig, _) {
-              if (!remoteConfig.showHelpGuide) return const SliverToBoxAdapter(child: SizedBox.shrink());
-              return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                sliver: SliverToBoxAdapter(
-                  child: _ScanCard(
-                    icon: Icons.help_outline_rounded,
-                    label: 'Help & Guide',
-                    subtitle: 'Learn how to use ScanAiRZ',
-                    gradientColors: const [Color(0xFF0A3D5C), Color(0xFF0D5C8A)],
-                    accentColor: const Color(0xFF29B6F6),
-                    tall: false,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const HelpGuideScreen()),
-                    ),
-                  ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: _ScanCard(
+                icon: Icons.help_outline_rounded,
+                label: 'Help & Guide',
+                subtitle: 'Learn how to use ScanAiRZ',
+                gradientColors: const [Color(0xFF0A3D5C), Color(0xFF0D5C8A)],
+                accentColor: const Color(0xFF29B6F6),
+                tall: false,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HelpGuideScreen()),
                 ),
-              );
-            },
+              ),
+            ),
           ),
 
           const SliverPadding(padding: EdgeInsets.only(bottom: 24)),

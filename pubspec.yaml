@@ -27,8 +27,9 @@ dependencies:
   vibration: ^3.1.3
   provider: ^6.1.5+1
   url_launcher: ^6.1.14
-  firebase_core: ^2.27.2
-  firebase_remote_config: ^4.3.20
+  flutter_native_splash: ^2.4.0
+  flutter_bluetooth_serial: ^0.4.0
+  usb_serial: ^0.5.2
 
 dev_dependencies:
   flutter_test:
@@ -43,6 +44,10 @@ flutter:
     - assets/sounds/
     - assets/images/
     - assets/logo.png
-    - assets/images/illustrate the replacement of traditional barcode scanner with the mobile app.jpg
-    - assets/images/mobile scanning barcode for inventory illustrate.jpg
-    - assets/images/smartphone  wifi connecting it to a desktop computer, suggesting data transfer of a scanned barcode.add blueetoth and wifi usb logo.jpg
+    - assets/icons/app_icon.png
+
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/icons/app_icon.png
+  android_12:
+    image: assets/icons/app_icon.png

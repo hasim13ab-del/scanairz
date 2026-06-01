@@ -67,8 +67,10 @@ class PcConnector {
   }
 
   // ── Bluetooth connection ──────────────────────────────────────────────────
-  Future<List<BluetoothDevice>> getBluetoothDevices() =>
-      _btConnector.getPairedDevices();
+  Future<List<BluetoothDevice>> getBluetoothDevices() async {
+    final devices = await _btConnector.getPairedDevices();
+    return devices.cast<BluetoothDevice>();
+  }
 
   Future<bool> connectBluetooth(String macAddress) async {
     _activeType = ConnectionType.bluetooth;
@@ -80,7 +82,10 @@ class PcConnector {
   }
 
   // ── USB connection ────────────────────────────────────────────────────────
-  Future<List<UsbDevice>> getUsbDevices() => _usbConnector.getDevices();
+  Future<List<UsbDevice>> getUsbDevices() async {
+    final devices = await _usbConnector.getDevices();
+    return devices.cast<UsbDevice>();
+  }
 
   Future<bool> connectUsb(UsbDevice device) async {
     _activeType = ConnectionType.usb;
@@ -113,7 +118,7 @@ class PcConnector {
     switch (_activeType) {
       case ConnectionType.wifi:
         for (final scan in scans) {
-          _socket!.writeln(jsonEncode(scan.toJson()));
+          _socket!.writeln(jsonEncode({'barcode': scan.barcode}));
         }
         await _socket!.flush();
         break;

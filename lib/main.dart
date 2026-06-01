@@ -14,15 +14,11 @@ import 'package:scanairz/services/settings_service.dart';
 import 'package:scanairz/services/permission_service.dart';
 import 'package:scanairz/theme_notifier.dart';
 import 'package:scanairz/themes.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:scanairz/services/remote_config_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
   final prefs = await SharedPreferences.getInstance();
   final onboardingComplete = prefs.getBool('onboardingComplete') ?? false;
-  final remoteConfigService = await RemoteConfigService.create();
   final settingsService = SettingsService();
   final storageService = StorageService();
   final pcConnector = PcConnector();
@@ -31,7 +27,6 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
-        Provider<RemoteConfigService>.value(value: remoteConfigService),
         Provider<SettingsService>.value(value: settingsService),
         Provider<StorageService>.value(value: storageService),
         Provider<PcConnector>.value(value: pcConnector),

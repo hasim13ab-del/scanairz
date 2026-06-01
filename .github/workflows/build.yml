@@ -58,6 +58,11 @@ jobs:
             > android/key.properties
           echo "Signing keystore configured."
 
+      - name: Patch flutter_bluetooth_serial namespace
+        run: |
+          sed -i "s/android {/android {\n    namespace 'io.github.edufolly.flutterbluetoothserial'/" $HOME/.pub-cache/hosted/pub.dev/flutter_bluetooth_serial-0.4.0/android/build.gradle
+          sed -i "s/compileSdkVersion 30/compileSdkVersion 33/" $HOME/.pub-cache/hosted/pub.dev/flutter_bluetooth_serial-0.4.0/android/build.gradle
+
       - name: Build release APK
         run: flutter build apk --release
 
@@ -92,33 +97,18 @@ jobs:
       - name: Enable Windows desktop target
         run: flutter config --enable-windows-desktop
 
-      - name: Scaffold companion project
-        shell: bash
-        run: |
-          flutter create \
-            --platforms=windows \
-            --org=com.airz \
-            --project-name=scanairz_companion \
-            ${{ runner.temp }}/companion_build
-
-      - name: Copy custom source into project
-        shell: bash
-        run: |
-          cp tools/pc_companion_source/lib/main.dart ${{ runner.temp }}/companion_build/lib/main.dart
-          cp tools/pc_companion_source/pubspec.yaml  ${{ runner.temp }}/companion_build/pubspec.yaml
-
       - name: Get companion dependencies
-        working-directory: ${{ runner.temp }}/companion_build
+        working-directory: tools/pc_companion
         run: flutter pub get
 
       - name: Build companion release
-        working-directory: ${{ runner.temp }}/companion_build
+        working-directory: tools/pc_companion
         run: flutter build windows --release
 
       - name: Package companion as zip
         shell: pwsh
         run: |
-          $src = "${{ runner.temp }}/companion_build/build/windows/x64/runner/Release"
+          $src = "tools/pc_companion/build/windows/x64/runner/Release"
           Compress-Archive -Path "$src\*" -DestinationPath "scanairz-pc-companion.zip" -Force
 
       - name: Upload PC Companion
