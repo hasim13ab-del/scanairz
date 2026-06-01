@@ -1,4 +1,3 @@
-
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:csv/csv.dart';
@@ -29,9 +28,7 @@ class _BatchScanScreenState extends State<BatchScanScreen>
   late SettingsService _settingsService;
   late StorageService _storageService;
   Future<void>? _loadSettingsFuture;
-
   late AnimationController _animationController;
-
   bool _vibration = true;
   bool _laserAnimation = true;
 
@@ -77,7 +74,6 @@ class _BatchScanScreenState extends State<BatchScanScreen>
     if (barcodes.isNotEmpty) {
       final barcode = barcodes.first;
       if (barcode.rawValue != null && mounted) {
-        // To prevent rapid-fire scanning of the same barcode
         if (_scannedBarcodes.isEmpty ||
             _scannedBarcodes.last.barcode != barcode.rawValue) {
           setState(() {
@@ -88,9 +84,7 @@ class _BatchScanScreenState extends State<BatchScanScreen>
               timestamp: DateTime.now(),
             ));
           });
-          if (_vibration) {
-            Vibration.vibrate(duration: 100);
-          }
+          if (_vibration) Vibration.vibrate(duration: 80);
           _audioPlayer.play(AssetSource('sounds/beep.mp3'));
         }
       }
@@ -99,35 +93,56 @@ class _BatchScanScreenState extends State<BatchScanScreen>
 
   @override
   Widget build(BuildContext context) {
-    const double scanWindowSize = 250.0;
+    final size = MediaQuery.of(context).size;
+    // Viewfinder takes up ~40% of screen height in batch mode (list needs room below)
+    final double viewfinderHeight = size.height * 0.40;
     final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Batch Scan'),
         actions: [
+          if (_scannedBarcodes.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00ACC1).withAlpha(40),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF00ACC1).withAlpha(80)),
+                  ),
+                  child: Text(
+                    '${_scannedBarcodes.length} scanned',
+                    style: const TextStyle(
+                      color: Color(0xFF26C6DA),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.flashlight_on_outlined),
-            onPressed: () {
-              _scannerController.toggleTorch();
-            },
+            onPressed: () => _scannerController.toggleTorch(),
             tooltip: 'Torch',
           ),
           IconButton(
             icon: const Icon(Icons.clear_all),
-            onPressed: () {
-              setState(() {
-                _scannedBarcodes.clear();
-              });
-            },
-            tooltip: 'Clear Scans',
+            onPressed: _scannedBarcodes.isEmpty
+                ? null
+                : () => setState(() => _scannedBarcodes.clear()),
+            tooltip: 'Clear',
           ),
         ],
       ),
       body: Column(
         children: [
+          // Camera viewfinder
           SizedBox(
-            height: scanWindowSize,
+            height: viewfinderHeight,
             width: double.infinity,
             child: Stack(
               children: [
@@ -135,95 +150,186 @@ class _BatchScanScreenState extends State<BatchScanScreen>
                   controller: _scannerController,
                   onDetect: _onBarcodeDetected,
                 ),
+                // Laser animation
                 if (_laserAnimation)
                   AnimatedBuilder(
                     animation: _animationController,
-                    builder: (context, child) {
-                      return Positioned(
-                        top: scanWindowSize * _animationController.value,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          height: 2,
-                          decoration: BoxDecoration(
-                            boxShadow: [
-                              BoxShadow(
-                                color: theme.colorScheme.secondary.withAlpha(204),
-                                blurRadius: 5.0,
-                                spreadRadius: 2.0,
-                              ),
+                    builder: (context, _) => Positioned(
+                      top: viewfinderHeight * _animationController.value - 1,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 2,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Colors.transparent,
+                              Color(0xFF00ACC1),
+                              Color(0xFF00ACC1),
+                              Colors.transparent,
                             ],
-                            color: theme.colorScheme.secondary,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00ACC1).withAlpha(150),
+                              blurRadius: 6,
+                              spreadRadius: 1,
+                            ),
+                          ],
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
+                // Corner brackets overlay
                 CustomPaint(
-                  painter: BarcodeBoxPainter(),
-                  child: const SizedBox(
-                    width: double.infinity,
-                    height: scanWindowSize,
+                  painter: _BatchCornerPainter(),
+                  child: SizedBox(width: double.infinity, height: viewfinderHeight),
+                ),
+                // "Scanning..." label
+                Positioned(
+                  bottom: 10,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(130),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Text(
+                        'Scanning continuously — aim at barcode',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ),
                   ),
-                )
+                ),
               ],
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Scanned Items:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+          // Scanned list header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+            child: Row(
+              children: [
+                const Text(
+                  'Scanned Items',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                if (_scannedBarcodes.isNotEmpty)
+                  Text(
+                    '${_scannedBarcodes.length} total',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
             ),
           ),
+          const Divider(height: 1),
+
+          // Scanned list
           Expanded(
             child: _scannedBarcodes.isEmpty
-                ? const Center(
-                    child: Text('Scan an item to begin.'),
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.qr_code_2,
+                          size: 56,
+                          color: theme.colorScheme.outline,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No items scanned yet',
+                          style: TextStyle(color: theme.colorScheme.outline),
+                        ),
+                      ],
+                    ),
                   )
                 : ListView.builder(
                     itemCount: _scannedBarcodes.length,
                     itemBuilder: (context, index) {
-                      final scanResult =
-                          _scannedBarcodes.reversed.toList()[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 4,
+                      final scan = _scannedBarcodes.reversed.toList()[index];
+                      return ListTile(
+                        dense: true,
+                        leading: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00ACC1).withAlpha(25),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        child: ListTile(
-                          title: Text(scanResult.barcode),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.remove_circle_outline),
-                            onPressed: () {
-                              setState(() {
-                                _scannedBarcodes.remove(scanResult);
-                              });
-                            },
+                          child: Center(
+                            child: Text(
+                              '${_scannedBarcodes.length - index}',
+                              style: const TextStyle(
+                                color: Color(0xFF00ACC1),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
                           ),
+                        ),
+                        title: Text(
+                          scan.barcode,
+                          style: const TextStyle(fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          DateFormat('HH:mm:ss').format(scan.timestamp),
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.remove_circle_outline, size: 20),
+                          color: theme.colorScheme.error,
+                          onPressed: () {
+                            setState(() => _scannedBarcodes.remove(scan));
+                          },
                         ),
                       );
                     },
                   ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: _scannedBarcodes.isEmpty
-                      ? null
-                      : () => _showSaveBatchDialog(),
-                  child: const Text('Save Batch'),
-                ),
-                ElevatedButton(
-                  onPressed: _scannedBarcodes.isEmpty
-                      ? null
-                      : () => _exportBatch(),
-                  child: const Text('Export Batch'),
-                ),
-              ],
+
+          // Action buttons
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _scannedBarcodes.isEmpty ? null : _showSaveBatchDialog,
+                      icon: const Icon(Icons.save_outlined, size: 18),
+                      label: const Text('Save Batch'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1A2744),
+                        side: const BorderSide(color: Color(0xFF1A2744)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _scannedBarcodes.isEmpty ? null : _exportBatch,
+                      icon: const Icon(Icons.upload_rounded, size: 18),
+                      label: const Text('Export CSV'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -232,41 +338,40 @@ class _BatchScanScreenState extends State<BatchScanScreen>
   }
 
   void _showSaveBatchDialog() {
-    final batchNameController = TextEditingController();
+    final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Save Batch'),
         content: TextField(
-          controller: batchNameController,
-          decoration: const InputDecoration(hintText: 'Enter batch name'),
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Batch name',
+            hintText: 'e.g. Warehouse A — Monday',
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
             onPressed: () async {
-              if (batchNameController.text.isNotEmpty) {
-                final newBatch = Batch(
-                  name: batchNameController.text,
-                  timestamp: DateTime.now(),
-                  scans: List<ScanResult>.from(_scannedBarcodes),
-                );
-                final messenger = ScaffoldMessenger.of(context);
-                final navigator = Navigator.of(context);
-                final batches = await _storageService.loadBatches();
-                batches.add(newBatch);
-                await _storageService.saveBatches(batches);
-                setState(() {
-                  _scannedBarcodes.clear();
-                });
-                navigator.pop();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Batch saved successfully!')),
-                );
-              }
+              if (controller.text.trim().isEmpty) return;
+              final newBatch = Batch(
+                name: controller.text.trim(),
+                timestamp: DateTime.now(),
+                scans: List<ScanResult>.from(_scannedBarcodes),
+              );
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(ctx);
+              final batches = await _storageService.loadBatches();
+              batches.add(newBatch);
+              await _storageService.saveBatches(batches);
+              setState(() => _scannedBarcodes.clear());
+              navigator.pop();
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Batch saved!')),
+              );
             },
             child: const Text('Save'),
           ),
@@ -278,89 +383,58 @@ class _BatchScanScreenState extends State<BatchScanScreen>
   Future<void> _exportBatch() async {
     final messenger = ScaffoldMessenger.of(context);
     if (_scannedBarcodes.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('No items to export.')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('No items to export.')));
       return;
     }
-
-    final List<List<dynamic>> rows = [];
-    rows.add(['Barcode', 'Format', 'Timestamp']);
-    for (final scan in _scannedBarcodes) {
-      rows.add([
-        scan.barcode,
-        scan.format,
-        DateFormat.yMd().add_jms().format(scan.timestamp)
-      ]);
-    }
-
-    final String csv = const ListToCsvConverter().convert(rows);
-
+    final rows = <List<dynamic>>[
+      ['Barcode', 'Format', 'Timestamp'],
+      ..._scannedBarcodes.map((s) => [
+            s.barcode,
+            s.format,
+            DateFormat('yyyy-MM-dd HH:mm:ss').format(s.timestamp),
+          ]),
+    ];
+    final csv = const ListToCsvConverter().convert(rows);
     try {
-      final Directory tempDir = await getTemporaryDirectory();
-      final String fileName = 'scanairz_batch_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final File file = File('${tempDir.path}/$fileName');
-
+      final dir = await getTemporaryDirectory();
+      final fileName = 'scanairz_batch_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+      final file = File('${dir.path}/$fileName');
       await file.writeAsString(csv);
-
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: 'ScanAirZ Batch Export',
-        text: 'Here is the batch of scanned barcodes from ScanAirZ.',
+        subject: 'ScanAiRZ Batch Export',
+        text: 'Scanned barcodes from ScanAiRZ.',
       );
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Error exporting batch: $e')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('Export error: $e')));
     }
   }
 }
 
-class BarcodeBoxPainter extends CustomPainter {
-  final double cornerLength;
-  final double strokeWidth;
-  final Color color;
-
-  BarcodeBoxPainter({
-    this.cornerLength = 30.0,
-    this.strokeWidth = 5.0,
-    this.color = Colors.green,
-  });
-
+class _BatchCornerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
+    const len = 30.0;
+    const sw = 3.5;
     final paint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke;
+      ..color = const Color(0xFF00ACC1)
+      ..strokeWidth = sw
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
 
+    const margin = 20.0;
     final path = Path();
-
-    // Top-left corner
-    path.moveTo(0, cornerLength);
-    path.lineTo(0, 0);
-    path.lineTo(cornerLength, 0);
-
-    // Top-right corner
-    path.moveTo(size.width - cornerLength, 0);
-    path.lineTo(size.width, 0);
-    path.lineTo(size.width, cornerLength);
-
-    // Bottom-left corner
-    path.moveTo(0, size.height - cornerLength);
-    path.lineTo(0, size.height);
-    path.lineTo(cornerLength, size.height);
-
-    // Bottom-right corner
-    path.moveTo(size.width - cornerLength, size.height);
-    path.lineTo(size.width, size.height);
-    path.lineTo(size.width, size.height - cornerLength);
-
+    // Top-left
+    path.moveTo(margin, margin + len); path.lineTo(margin, margin); path.lineTo(margin + len, margin);
+    // Top-right
+    path.moveTo(size.width - margin - len, margin); path.lineTo(size.width - margin, margin); path.lineTo(size.width - margin, margin + len);
+    // Bottom-left
+    path.moveTo(margin, size.height - margin - len); path.lineTo(margin, size.height - margin); path.lineTo(margin + len, size.height - margin);
+    // Bottom-right
+    path.moveTo(size.width - margin - len, size.height - margin); path.lineTo(size.width - margin, size.height - margin); path.lineTo(size.width - margin, size.height - margin - len);
     canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
-  }
+  bool shouldRepaint(_BatchCornerPainter old) => false;
 }
