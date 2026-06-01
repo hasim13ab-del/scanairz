@@ -339,7 +339,7 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          Image.asset('assets/logo.png', height: 32, errorBuilder: (_, __, ___) => const Icon(Icons.qr_code_scanner, color: Color(0xFF00ACC1), size: 32)),
+          Image.asset('assets/app_icon.png', height: 32, errorBuilder: (_, __, ___) => const Icon(Icons.qr_code_scanner, color: Color(0xFF00ACC1), size: 32)),
           const SizedBox(width: 12),
           const Text('ScanAiRZ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
           const Text(' PC Companion', style: TextStyle(fontSize: 14, color: Color(0xFF90A4AE))),

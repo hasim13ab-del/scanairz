@@ -43,7 +43,7 @@ flutter:
   assets:
     - assets/sounds/
     - assets/images/
-    - assets/logo.png
+    - assets/app_icon.png
     - assets/icons/app_icon.png
 
 flutter_native_splash:

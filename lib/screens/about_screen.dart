@@ -12,9 +12,9 @@ class AboutScreen extends StatelessWidget {
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),
-        children: const [
-          Icon(Icons.qr_code_scanner, size: 72),
-          SizedBox(height: 16),
+        children: [
+          Image.asset('assets/app_icon.png', height: 72),
+          const SizedBox(height: 16),
           Text(
             'ScanAiRZ',
             textAlign: TextAlign.center,
