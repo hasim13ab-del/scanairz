@@ -7,8 +7,9 @@ on:
     branches: [ main ]
 
 jobs:
+  # ── Android APK + AAB ──────────────────────────────────────────────────────
   build-android:
-    name: Build Android APK
+    name: Build Android (APK + AAB)
     runs-on: ubuntu-latest
 
     steps:
@@ -17,13 +18,13 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
 
       - name: Get dependencies
@@ -38,38 +39,97 @@ jobs:
                 PKG=$(grep -oP 'package="\K[^"]+' "$MANIFEST" || true)
                 if [ -n "$PKG" ]; then
                   sed -i "s/android {/android {\n    namespace '$PKG'/" "$f"
-                  echo "Patched: $f  =>  namespace '$PKG'"
+                  echo "Patched: $f => namespace '$PKG'"
                 fi
               fi
             fi
           done
 
-      - name: Build Android APK (debug)
-        run: flutter build apk --debug
+      - name: Set up release signing
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64:      ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS:            ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD:         ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD:    ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/scanairz-release.jks
+          cat > android/key.properties << EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=scanairz-release.jks
+          EOF
+          echo "Keystore configured."
 
-      - name: Upload Android APK
+      - name: Build release APK
+        run: flutter build apk --release
+        continue-on-error: false
+
+      - name: Build release AAB (Play Store)
+        run: flutter build appbundle --release
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: scanairz-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
 
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanairz-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+
+  # ── Windows PC Companion (Flutter desktop) ────────────────────────────────
   build-pc-companion:
-    name: Build Windows PC Companion EXE
+    name: Build Windows PC Companion
     runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@v1
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          sdk: stable
+          channel: stable
+          cache: true
 
-      - name: Compile PC Companion to EXE
-        run: dart compile exe tools/pc_companion/bin/scanairz_pc.dart -o scanairz_pc.exe
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
 
-      - name: Upload PC Companion EXE
+      - name: Scaffold companion project
+        shell: bash
+        run: |
+          flutter create \
+            --platforms=windows \
+            --org=com.airz \
+            --project-name=scanairz_companion \
+            /tmp/companion_build
+
+      - name: Copy custom source
+        shell: bash
+        run: |
+          cp tools/pc_companion_source/lib/main.dart /tmp/companion_build/lib/main.dart
+          cp tools/pc_companion_source/pubspec.yaml  /tmp/companion_build/pubspec.yaml
+
+      - name: Get companion dependencies
+        working-directory: /tmp/companion_build
+        run: flutter pub get
+
+      - name: Build companion (Release)
+        working-directory: /tmp/companion_build
+        run: flutter build windows --release
+
+      - name: Package companion as zip
+        shell: pwsh
+        run: |
+          $src = "/tmp/companion_build/build/windows/x64/runner/Release"
+          Compress-Archive -Path "$src\*" -DestinationPath "scanairz-pc-companion.zip" -Force
+          Write-Host "Packaged companion to scanairz-pc-companion.zip"
+
+      - name: Upload PC Companion
         uses: actions/upload-artifact@v4
         with:
-          name: pc-companion-windows
-          path: scanairz_pc.exe
+          name: scanairz-pc-companion-windows
+          path: scanairz-pc-companion.zip
