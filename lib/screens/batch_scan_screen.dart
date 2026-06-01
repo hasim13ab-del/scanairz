@@ -49,6 +49,7 @@ class _BatchScanScreenState extends State<BatchScanScreen>
     await permissionService.requestCameraPermission();
     if (mounted) {
       _scannerController.start();
+      _scannerController.setZoom(0.1);
     }
   }
 
@@ -173,6 +174,7 @@ class _BatchScanScreenState extends State<BatchScanScreen>
               children: [
                 MobileScanner(
                   controller: _scannerController,
+                  fit: BoxFit.cover,
                   scanWindow: Rect.fromLTWH(0, 0, size.width, viewfinderHeight),
                   onDetect: _onBarcodeDetected,
                 ),

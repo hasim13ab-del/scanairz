@@ -46,6 +46,7 @@ class _SingleScanScreenState extends State<SingleScanScreen>
     await permissionService.requestCameraPermission();
     if (mounted) {
       _scannerController.start();
+      _scannerController.setZoom(0.1);
     }
   }
 
@@ -111,6 +112,7 @@ class _SingleScanScreenState extends State<SingleScanScreen>
               Positioned.fill(
                 child: MobileScanner(
                   controller: _scannerController,
+                  fit: BoxFit.cover,
                   scanWindow: Rect.fromCenter(
                     center: Offset(size.width / 2, size.height / 2),
                     width: scanWindowSize,
