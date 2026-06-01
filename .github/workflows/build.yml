@@ -7,9 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  # ── Android APK + AAB ──────────────────────────────────────────────────────
   build-android:
-    name: Build Android (APK + AAB)
+    name: Build Android APK and AAB
     runs-on: ubuntu-latest
 
     steps:
@@ -30,7 +29,7 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Fix plugin namespaces (AGP 8+ compatibility)
+      - name: Fix plugin namespaces for AGP 8
         run: |
           find $HOME/.pub-cache -name "build.gradle" -path "*/android/build.gradle" | while read f; do
             if grep -q "com.android.library" "$f" && ! grep -q "namespace" "$f"; then
@@ -39,49 +38,44 @@ jobs:
                 PKG=$(grep -oP 'package="\K[^"]+' "$MANIFEST" || true)
                 if [ -n "$PKG" ]; then
                   sed -i "s/android {/android {\n    namespace '$PKG'/" "$f"
-                  echo "Patched: $f => namespace '$PKG'"
+                  echo "Patched namespace: $PKG"
                 fi
               fi
             fi
           done
 
-      - name: Set up release signing
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+      - name: Set up release signing keystore
+        if: env.KEYSTORE_BASE64 != ''
         env:
-          KEYSTORE_BASE64:      ${{ secrets.KEYSTORE_BASE64 }}
-          KEY_ALIAS:            ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD:         ${{ secrets.KEY_PASSWORD }}
-          KEYSTORE_PASSWORD:    ${{ secrets.KEYSTORE_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/scanairz-release.jks
-          cat > android/key.properties << EOF
-          storePassword=$KEYSTORE_PASSWORD
-          keyPassword=$KEY_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=scanairz-release.jks
-          EOF
-          echo "Keystore configured."
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=scanairz-release.jks\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" \
+            > android/key.properties
+          echo "Signing keystore configured."
 
       - name: Build release APK
         run: flutter build apk --release
-        continue-on-error: false
 
-      - name: Build release AAB (Play Store)
+      - name: Build release AAB for Play Store
         run: flutter build appbundle --release
 
-      - name: Upload APK
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: scanairz-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Upload AAB
+      - name: Upload release AAB
         uses: actions/upload-artifact@v4
         with:
           name: scanairz-release-aab
           path: build/app/outputs/bundle/release/app-release.aab
 
-  # ── Windows PC Companion (Flutter desktop) ────────────────────────────────
   build-pc-companion:
     name: Build Windows PC Companion
     runs-on: windows-latest
@@ -95,7 +89,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Enable Windows desktop
+      - name: Enable Windows desktop target
         run: flutter config --enable-windows-desktop
 
       - name: Scaffold companion project
@@ -107,7 +101,7 @@ jobs:
             --project-name=scanairz_companion \
             /tmp/companion_build
 
-      - name: Copy custom source
+      - name: Copy custom source into project
         shell: bash
         run: |
           cp tools/pc_companion_source/lib/main.dart /tmp/companion_build/lib/main.dart
@@ -117,7 +111,7 @@ jobs:
         working-directory: /tmp/companion_build
         run: flutter pub get
 
-      - name: Build companion (Release)
+      - name: Build companion release
         working-directory: /tmp/companion_build
         run: flutter build windows --release
 
@@ -126,7 +120,6 @@ jobs:
         run: |
           $src = "/tmp/companion_build/build/windows/x64/runner/Release"
           Compress-Archive -Path "$src\*" -DestinationPath "scanairz-pc-companion.zip" -Force
-          Write-Host "Packaged companion to scanairz-pc-companion.zip"
 
       - name: Upload PC Companion
         uses: actions/upload-artifact@v4
