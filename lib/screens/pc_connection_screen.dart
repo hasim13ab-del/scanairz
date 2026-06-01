@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'package:usb_serial/usb_serial.dart';
+import 'package:scanairz/services/network_discovery_service.dart';
 import 'package:scanairz/services/pc_connector.dart';
-import 'package:scanairz/services/permission_service.dart';
 import 'package:scanairz/services/settings_service.dart';
 import 'package:scanairz/services/storage_service.dart';
 
@@ -15,40 +13,22 @@ class PcConnectionScreen extends StatefulWidget {
   State<PcConnectionScreen> createState() => _PcConnectionScreenState();
 }
 
-class _PcConnectionScreenState extends State<PcConnectionScreen>
-    with SingleTickerProviderStateMixin {
-  // Controllers
+class _PcConnectionScreenState extends State<PcConnectionScreen> {
   final _ipController = TextEditingController();
   final _portController = TextEditingController(text: '8765');
-  late TabController _tabController;
 
-  // Services (injected)
   late PcConnector _pcConnector;
   late SettingsService _settingsService;
   late StorageService _storageService;
-  late PermissionService _permissionService;
 
-  // State
   StreamSubscription<bool>? _connSub;
   bool _isConnected = false;
   bool _isBusy = false;
-  String _statusMessage = 'Not connected';
+  bool _isDiscovering = false;
   final List<String> _log = [];
 
-  // Bluetooth
-  List<BluetoothDevice> _btDevices = [];
-  BluetoothDevice? _selectedBtDevice;
-
-  // USB
-  List<UsbDevice> _usbDevices = [];
-  UsbDevice? _selectedUsbDevice;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(_onTabChanged);
-  }
+  final NetworkDiscoveryService _discovery = NetworkDiscoveryService();
+  StreamSubscription<List<String>>? _discoverySub;
 
   @override
   void didChangeDependencies() {
@@ -56,14 +36,12 @@ class _PcConnectionScreenState extends State<PcConnectionScreen>
     _pcConnector = Provider.of<PcConnector>(context, listen: false);
     _settingsService = Provider.of<SettingsService>(context, listen: false);
     _storageService = Provider.of<StorageService>(context, listen: false);
-    _permissionService = Provider.of<PermissionService>(context, listen: false);
     _isConnected = _pcConnector.isConnected;
-    _connSub ??=
-        _pcConnector.connectionStatus.listen(_onConnectionChanged);
-    _loadWifiSettings();
+    _connSub ??= _pcConnector.connectionStatus.listen(_onConnectionChanged);
+    _loadSavedSettings();
   }
 
-  Future<void> _loadWifiSettings() async {
+  Future<void> _loadSavedSettings() async {
     final s = await _settingsService.loadSettings();
     if (!mounted) return;
     setState(() {
@@ -72,95 +50,99 @@ class _PcConnectionScreenState extends State<PcConnectionScreen>
     });
   }
 
-  void _onTabChanged() {
-    if (!_tabController.indexIsChanging) return;
-    // Load device lists on tab switch
-    if (_tabController.index == 1) _loadBluetoothDevices();
-    if (_tabController.index == 2) _loadUsbDevices();
-  }
-
   void _onConnectionChanged(bool connected) {
     if (!mounted) return;
     setState(() {
       _isConnected = connected;
-      _statusMessage =
-          connected ? '✅ Connected via ${_pcConnector.activeType.name.toUpperCase()}' : '🔴 Disconnected';
-      _addLog(_statusMessage);
+      _addLog(connected
+          ? '✅ Connected via WiFi'
+          : '🔴 Disconnected');
     });
   }
 
   void _addLog(String msg) {
-    setState(() => _log.insert(0, '[${TimeOfDay.now().format(context)}] $msg'));
+    final now = TimeOfDay.now();
+    final time = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    setState(() => _log.insert(0, '[$time] $msg'));
+    if (_log.length > 50) _log.removeLast();
   }
 
-  // ── WiFi ──────────────────────────────────────────────────────────────────
-  Future<void> _connectWifi() async {
+  Future<void> _findPc() async {
+    if (_isDiscovering) return;
+    setState(() { _isDiscovering = true; });
+    _addLog('Searching for ScanAiRZ PC Companion on your network…');
+
+    await _discoverySub?.cancel();
+    bool found = false;
+
+    _discoverySub = _discovery.discoveredDevices.listen((devices) {
+      if (!mounted || found) return;
+      if (devices.isNotEmpty) {
+        found = true;
+        final device = devices.first;
+        final parts = device.split(':');
+        if (mounted) {
+          setState(() {
+            _ipController.text = parts[0];
+            if (parts.length > 1) _portController.text = parts[1];
+            _isDiscovering = false;
+          });
+          _addLog('Found PC Companion at ${parts[0]}! IP filled in automatically.');
+        }
+        _discovery.stopDiscovery();
+      }
+    });
+
+    _discovery.startDiscovery();
+
+    // Timeout after 10 seconds
+    Future.delayed(const Duration(seconds: 10), () {
+      if (!mounted) return;
+      if (_isDiscovering && !found) {
+        _discovery.stopDiscovery();
+        setState(() => _isDiscovering = false);
+        _addLog('PC Companion not found. Make sure it is running on the same WiFi network.');
+      }
+    });
+  }
+
+  Future<void> _connect() async {
     final ip = _ipController.text.trim();
     final port = int.tryParse(_portController.text.trim());
     if (ip.isEmpty || port == null) {
-      _addLog('Enter a valid IP and port.');
+      _addLog('Enter a valid IP address and port.');
       return;
     }
-    setState(() { _isBusy = true; _statusMessage = 'Connecting via WiFi…'; });
-    _addLog('Connecting to $ip:$port via WiFi…');
+    setState(() { _isBusy = true; });
+    _addLog('Connecting to $ip:$port…');
+    // Save IP for next session
+    final existing = await _settingsService.loadSettings();
+    await _settingsService.saveSettings(
+      connectionMethod: existing['connectionMethod'] as String? ?? 'Wi-Fi',
+      ipAddress: ip,
+      port: port.toString(),
+      continuousScan: existing['continuousScan'] as bool? ?? false,
+      vibration: existing['vibration'] as bool? ?? true,
+      laserAnimation: existing['laserAnimation'] as bool? ?? true,
+      saveHistory: existing['saveHistory'] as bool? ?? true,
+      autoClearHistoryDays: existing['autoClearHistoryDays'] as int? ?? 7,
+      theme: existing['theme'] as String? ?? 'System',
+    );
     final ok = await _pcConnector.connectWifi(ip, port);
     setState(() => _isBusy = false);
-    if (!ok) _addLog('WiFi connection failed. Check IP and port.');
+    if (!ok) _addLog('❌ Connection failed. Check IP and make sure PC Companion is running.');
   }
 
-  // ── Bluetooth ─────────────────────────────────────────────────────────────
-  Future<void> _loadBluetoothDevices() async {
-    await _permissionService.requestBluetoothPermissions();
-    setState(() { _isBusy = true; _addLog('Scanning for paired BT devices…'); });
-    _btDevices = await _pcConnector.getBluetoothDevices();
-    setState(() { _isBusy = false; });
-    if (_btDevices.isEmpty) _addLog('No paired Bluetooth devices found.');
-  }
-
-  Future<void> _connectBluetooth() async {
-    if (_selectedBtDevice == null) {
-      _addLog('Select a Bluetooth device first.');
-      return;
-    }
-    setState(() { _isBusy = true; _statusMessage = 'Connecting via Bluetooth…'; });
-    _addLog('Connecting to ${_selectedBtDevice!.name}…');
-    final ok =
-        await _pcConnector.connectBluetooth(_selectedBtDevice!.address);
-    setState(() => _isBusy = false);
-    if (!ok) _addLog('Bluetooth connection failed.');
-  }
-
-  // ── USB ───────────────────────────────────────────────────────────────────
-  Future<void> _loadUsbDevices() async {
-    setState(() { _isBusy = true; _addLog('Detecting USB devices…'); });
-    _usbDevices = await _pcConnector.getUsbDevices();
-    setState(() { _isBusy = false; });
-    if (_usbDevices.isEmpty) _addLog('No USB serial devices found. Connect your device via OTG cable.');
-  }
-
-  Future<void> _connectUsb() async {
-    if (_selectedUsbDevice == null) {
-      _addLog('Select a USB device first.');
-      return;
-    }
-    setState(() { _isBusy = true; _statusMessage = 'Connecting via USB…'; });
-    _addLog('Connecting to ${_selectedUsbDevice!.productName}…');
-    final ok = await _pcConnector.connectUsb(_selectedUsbDevice!);
-    setState(() => _isBusy = false);
-    if (!ok) _addLog('USB connection failed. Try reconnecting the cable.');
-  }
-
-  // ── Sync ──────────────────────────────────────────────────────────────────
   Future<void> _sync() async {
     if (!_isConnected) { _addLog('Not connected.'); return; }
     final scans = await _storageService.loadScanResults();
     if (scans.isEmpty) { _addLog('No scans to sync.'); return; }
     setState(() => _isBusy = true);
-    _addLog('Syncing ${scans.length} scans…');
+    _addLog('Syncing ${scans.length} scan(s)…');
     try {
       await _pcConnector.syncData(scans);
       await _storageService.clearScanResults();
-      _addLog('✅ Sync complete!');
+      _addLog('✅ Sync complete! ${scans.length} scan(s) sent to PC.');
     } catch (e) {
       _addLog('Sync failed: $e');
     }
@@ -175,312 +157,309 @@ class _PcConnectionScreenState extends State<PcConnectionScreen>
   @override
   void dispose() {
     _connSub?.cancel();
+    _discoverySub?.cancel();
+    _discovery.dispose();
     _ipController.dispose();
     _portController.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 
-  // ── UI ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('PC Connection'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.wifi), text: 'WiFi'),
-            Tab(icon: Icon(Icons.bluetooth), text: 'Bluetooth'),
-            Tab(icon: Icon(Icons.usb), text: 'USB'),
-          ],
-        ),
-      ),
+      appBar: AppBar(title: const Text('PC Sync')),
       body: Column(
         children: [
-          _buildStatusBanner(theme),
+          _StatusBanner(isConnected: _isConnected, isBusy: _isBusy),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+
+                  // How-to card
+                  if (!_isConnected)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00ACC1).withAlpha(20),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF00ACC1).withAlpha(60)),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline, color: Color(0xFF00ACC1), size: 20),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Run the ScanAiRZ PC Companion on your Windows PC first, '
+                              'then tap "Find PC" or enter the IP shown on the PC app.',
+                              style: TextStyle(fontSize: 13, height: 1.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // WiFi connection card
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.wifi, color: Color(0xFF00ACC1), size: 24),
+                              SizedBox(width: 10),
+                              Text(
+                                'WiFi Connection',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Find PC button
+                          OutlinedButton.icon(
+                            onPressed: (_isConnected || _isDiscovering) ? null : _findPc,
+                            icon: _isDiscovering
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.search, size: 18),
+                            label: Text(_isDiscovering ? 'Searching…' : 'Find PC on Network'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF00ACC1),
+                              side: const BorderSide(color: Color(0xFF00ACC1)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+                          const Row(
+                            children: [
+                              Expanded(child: Divider()),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 12),
+                                child: Text('or enter manually', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              ),
+                              Expanded(child: Divider()),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          TextField(
+                            controller: _ipController,
+                            enabled: !_isConnected,
+                            decoration: const InputDecoration(
+                              labelText: 'PC IP Address',
+                              hintText: '192.168.1.x',
+                              prefixIcon: Icon(Icons.computer_outlined),
+                            ),
+                            keyboardType: TextInputType.url,
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _portController,
+                            enabled: !_isConnected,
+                            decoration: const InputDecoration(
+                              labelText: 'Port',
+                              hintText: '8765',
+                              prefixIcon: Icon(Icons.settings_ethernet),
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _isBusy ? null : (_isConnected ? _disconnect : _connect),
+                            icon: Icon(_isConnected ? Icons.link_off : Icons.link),
+                            label: Text(_isConnected ? 'Disconnect' : 'Connect'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _isConnected ? Colors.red.shade700 : const Color(0xFFF57C00),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Sync card
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.sync, color: Color(0xFF1A2744), size: 22),
+                              SizedBox(width: 10),
+                              Text('Send Scans to PC', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Scans will be typed directly into whichever field is active on the PC.',
+                            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withAlpha(140)),
+                          ),
+                          const SizedBox(height: 14),
+                          ElevatedButton.icon(
+                            onPressed: (_isConnected && !_isBusy) ? _sync : null,
+                            icon: const Icon(Icons.send_rounded, size: 18),
+                            label: const Text('Sync Scans to PC'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1A2744),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Coming soon card for BT/USB
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withAlpha(30),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.bluetooth, color: Colors.orange, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Bluetooth & USB', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                SizedBox(height: 2),
+                                Text('Coming in a future update', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withAlpha(30),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text('Soon', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                ],
+              ),
+            ),
+          ),
+
+          // Activity log
+          Container(
+            height: 130,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF0F4F8),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? const Color(0xFF243455) : const Color(0xFFCFD8DC),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildWifiTab(),
-                _buildBluetoothTab(),
-                _buildUsbTab(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: Row(
+                    children: [
+                      const Text('Activity Log', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      const Spacer(),
+                      if (_log.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => setState(() => _log.clear()),
+                          child: const Text('Clear', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: _log.isEmpty
+                      ? const Center(child: Text('No activity yet.', style: TextStyle(fontSize: 12, color: Colors.grey)))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          itemCount: _log.length,
+                          itemBuilder: (_, i) => Text(
+                            _log[i],
+                            style: const TextStyle(fontSize: 11, height: 1.5),
+                          ),
+                        ),
+                ),
               ],
             ),
           ),
-          _buildActionBar(theme),
-          _buildActivityLog(theme),
         ],
       ),
     );
   }
+}
 
-  Widget _buildStatusBanner(ThemeData theme) {
+class _StatusBanner extends StatelessWidget {
+  final bool isConnected;
+  final bool isBusy;
+  const _StatusBanner({required this.isConnected, required this.isBusy});
+
+  @override
+  Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      color: _isConnected ? Colors.green.shade700 : Colors.red.shade700,
+      color: isConnected ? Colors.green.shade700 : const Color(0xFF37474F),
       child: Row(
         children: [
-          Icon(_isConnected ? Icons.check_circle : Icons.cancel,
-              color: Colors.white, size: 18),
-          const SizedBox(width: 8),
+          Icon(
+            isConnected ? Icons.wifi : Icons.wifi_off,
+            color: Colors.white,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              _statusMessage,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold),
+              isConnected ? 'Connected to PC — Scans will be sent automatically' : 'Not connected to PC',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
             ),
           ),
-          if (_isBusy) const SizedBox(
-            width: 18, height: 18,
-            child: CircularProgressIndicator(
-                color: Colors.white, strokeWidth: 2),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── WiFi Tab ──────────────────────────────────────────────────────────────
-  Widget _buildWifiTab() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Icon(Icons.wifi, size: 48, color: Colors.blue),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _ipController,
-            decoration: const InputDecoration(
-              labelText: 'PC IP Address',
-              prefixIcon: Icon(Icons.computer),
-              border: OutlineInputBorder(),
+          if (isBusy)
+            const SizedBox(
+              width: 16, height: 16,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
             ),
-            keyboardType: TextInputType.url,
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _portController,
-            decoration: const InputDecoration(
-              labelText: 'Port (default 8765)',
-              prefixIcon: Icon(Icons.settings_ethernet),
-              border: OutlineInputBorder(),
-            ),
-            keyboardType: TextInputType.number,
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: _isBusy || _isConnected ? null : _connectWifi,
-            icon: const Icon(Icons.wifi_find),
-            label: const Text('Connect via WiFi'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Bluetooth Tab ─────────────────────────────────────────────────────────
-  Widget _buildBluetoothTab() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(children: [
-                Icon(Icons.bluetooth, size: 28, color: Colors.indigo),
-                SizedBox(width: 8),
-                Text('Paired Devices',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ]),
-              TextButton.icon(
-                onPressed: _isBusy ? null : _loadBluetoothDevices,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Scan'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _btDevices.isEmpty
-                ? const Center(
-                    child: Text('Tap Scan to find paired Bluetooth devices.\n'
-                        'Make sure your PC companion app is running and paired.',
-                        textAlign: TextAlign.center))
-                : ListView.builder(
-                    itemCount: _btDevices.length,
-                    itemBuilder: (_, i) {
-                      final d = _btDevices[i];
-                      return RadioListTile<BluetoothDevice>(
-                        title: Text(d.name ?? 'Unknown'),
-                        subtitle: Text(d.address),
-                        value: d,
-                        groupValue: _selectedBtDevice,
-                        onChanged: (v) =>
-                            setState(() => _selectedBtDevice = v),
-                        secondary: const Icon(Icons.bluetooth_connected,
-                            color: Colors.indigo),
-                      );
-                    },
-                  ),
-          ),
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: _isBusy || _isConnected || _selectedBtDevice == null
-                ? null
-                : _connectBluetooth,
-            icon: const Icon(Icons.bluetooth_searching),
-            label: const Text('Connect via Bluetooth'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.indigo,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── USB Tab ───────────────────────────────────────────────────────────────
-  Widget _buildUsbTab() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(children: [
-                Icon(Icons.usb, size: 28, color: Colors.teal),
-                SizedBox(width: 8),
-                Text('USB Devices',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ]),
-              TextButton.icon(
-                onPressed: _isBusy ? null : _loadUsbDevices,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Detect'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _usbDevices.isEmpty
-                ? const Center(
-                    child: Text(
-                        'Connect your PC via OTG USB cable, then tap Detect.',
-                        textAlign: TextAlign.center))
-                : ListView.builder(
-                    itemCount: _usbDevices.length,
-                    itemBuilder: (_, i) {
-                      final d = _usbDevices[i];
-                      return RadioListTile<UsbDevice>(
-                        title:
-                            Text(d.productName ?? 'Unknown USB Device'),
-                        subtitle: Text(
-                            'VID: ${d.vid}  PID: ${d.pid}'),
-                        value: d,
-                        groupValue: _selectedUsbDevice,
-                        onChanged: (v) =>
-                            setState(() => _selectedUsbDevice = v),
-                        secondary:
-                            const Icon(Icons.usb, color: Colors.teal),
-                      );
-                    },
-                  ),
-          ),
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: _isBusy || _isConnected || _selectedUsbDevice == null
-                ? null
-                : _connectUsb,
-            icon: const Icon(Icons.usb_rounded),
-            label: const Text('Connect via USB'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Bottom action bar ─────────────────────────────────────────────────────
-  Widget _buildActionBar(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _isConnected && !_isBusy ? _sync : null,
-              icon: const Icon(Icons.sync),
-              label: const Text('Sync Now'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade700,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: _isConnected ? _disconnect : null,
-            icon: const Icon(Icons.link_off),
-            label: const Text('Disconnect'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Activity log ──────────────────────────────────────────────────────────
-  Widget _buildActivityLog(ThemeData theme) {
-    return Container(
-      height: 140,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Text('Activity Log',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              itemCount: _log.length,
-              itemBuilder: (_, i) => Text(_log[i],
-                  style: const TextStyle(fontSize: 11)),
-            ),
-          ),
         ],
       ),
     );
