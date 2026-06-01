@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
@@ -69,100 +68,108 @@ class _SingleScanScreenState extends State<SingleScanScreen>
 
   @override
   Widget build(BuildContext context) {
-    const double scanWindowSize = 250.0;
+    final size = MediaQuery.of(context).size;
+    final double scanWindowSize = size.width * 0.82;
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
         title: const Text('Single Scan'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.flashlight_on_outlined),
-            onPressed: () {
-              _scannerController.toggleTorch();
-            },
+            icon: const Icon(Icons.flashlight_on_outlined, color: Colors.white),
+            onPressed: () => _scannerController.toggleTorch(),
             tooltip: 'Torch',
           ),
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
-          future: _settingsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return const Center(child: Text('Error loading settings'));
-            } else {
-              return Center(
-                child: SizedBox(
-                  width: scanWindowSize,
-                  height: scanWindowSize,
-                  child: Stack(
-                    children: [
-                      MobileScanner(
-                        controller: _scannerController,
-                        onDetect: (capture) {
-                          final barcodes = capture.barcodes;
-                          if (barcodes.isNotEmpty) {
-                            _onBarcodeDetect(barcodes.first);
-                          }
-                        },
-                      ),
-                      if (_laserAnimation)
-                        AnimatedBuilder(
-                          animation: _animationController,
-                          builder: (context, child) {
-                            return Positioned(
-                              top: scanWindowSize * _animationController.value,
-                              left: 0,
-                              right: 0,
-                              child: Container(
-                                height: 2,
-                                decoration: BoxDecoration(
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: theme.colorScheme.secondary.withAlpha(204),
-                                      blurRadius: 5.0,
-                                      spreadRadius: 2.0,
-                                    ),
-                                  ],
-                                  color: theme.colorScheme.secondary,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      CustomPaint(
-                        painter: BarcodeBoxPainter(),
-                        child: const SizedBox(
-                          width: scanWindowSize,
-                          height: scanWindowSize,
-                        ),
-                      )
-                    ],
-                  ),
+        future: _settingsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return const Center(child: Text('Error loading settings', style: TextStyle(color: Colors.white)));
+          }
+          return Stack(
+            children: [
+              // Full-screen camera preview
+              Positioned.fill(
+                child: MobileScanner(
+                  controller: _scannerController,
+                  onDetect: (capture) {
+                    final barcodes = capture.barcodes;
+                    if (barcodes.isNotEmpty) {
+                      _onBarcodeDetect(barcodes.first);
+                    }
+                  },
                 ),
-              );
-            }
-          }),
+              ),
+
+              // Dark overlay with transparent scan window
+              Positioned.fill(
+                child: _ScanOverlay(
+                  scanWindowSize: scanWindowSize,
+                  laserAnimation: _laserAnimation,
+                  animationController: _animationController,
+                  accentColor: theme.colorScheme.primary,
+                ),
+              ),
+
+              // Bottom hint
+              Positioned(
+                bottom: 40,
+                left: 0,
+                right: 0,
+                child: Column(
+                  children: [
+                    Text(
+                      'Align barcode within the frame',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(200),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (_continuousScan)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00ACC1).withAlpha(40),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFF00ACC1).withAlpha(80)),
+                          ),
+                          child: const Text(
+                            'Continuous mode ON',
+                            style: TextStyle(color: Color(0xFF26C6DA), fontSize: 12),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
   void _onBarcodeDetect(Barcode barcode) async {
-    if (_isHandlingScan) {
-      return;
-    }
-
+    if (_isHandlingScan) return;
     final scanResult = barcode.rawValue;
-    if (scanResult == null) {
-      return;
-    }
+    if (scanResult == null) return;
 
     _isHandlingScan = true;
 
-    if (_vibration) {
-      Vibration.vibrate(duration: 100);
-    }
+    if (_vibration) Vibration.vibrate(duration: 100);
 
     final newScan = ScanResult(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -194,150 +201,205 @@ class _SingleScanScreenState extends State<SingleScanScreen>
       if (mounted) {
         showDialog(
           context: context,
-          barrierDismissible: false, // User must tap button!
-          builder: (context) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16.0),
-            ),
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            child: _buildDialogContent(context, scanResult),
+          barrierDismissible: false,
+          builder: (ctx) => _ScanResultDialog(
+            scanResult: scanResult,
+            onScanAgain: () {
+              Navigator.of(ctx).pop();
+              _isHandlingScan = false;
+              if (mounted) _scannerController.start();
+            },
           ),
-        ).then((_) {
-          _isHandlingScan = false;
-          if (mounted) {
-            _scannerController.start();
-          }
-        });
+        );
       }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Scanned: $scanResult')),
+          SnackBar(
+            content: Text('Scanned: $scanResult'),
+            duration: const Duration(seconds: 1),
+          ),
         );
       }
       _isHandlingScan = false;
     }
   }
+}
 
-  Widget _buildDialogContent(BuildContext context, String scanResult) {
-    return Stack(
-      children: <Widget>[
-        Container(
-          padding: const EdgeInsets.only(
-            top: 66.0, // Space for the icon
-            bottom: 16.0,
-            left: 16.0,
-            right: 16.0,
-          ),
-          margin: const EdgeInsets.only(top: 45.0),
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            shape: BoxShape.rectangle,
-            borderRadius: BorderRadius.circular(16.0),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 10.0,
-                offset: Offset(0.0, 10.0),
+// ── Scan overlay with transparent cutout ──────────────────────────────────────
+class _ScanOverlay extends StatelessWidget {
+  final double scanWindowSize;
+  final bool laserAnimation;
+  final AnimationController animationController;
+  final Color accentColor;
+
+  const _ScanOverlay({
+    required this.scanWindowSize,
+    required this.laserAnimation,
+    required this.animationController,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _OverlayPainter(scanWindowSize: scanWindowSize),
+      child: Center(
+        child: SizedBox(
+          width: scanWindowSize,
+          height: scanWindowSize,
+          child: Stack(
+            children: [
+              // Corner brackets
+              CustomPaint(
+                painter: _CornerPainter(color: const Color(0xFF00ACC1)),
+                child: SizedBox(width: scanWindowSize, height: scanWindowSize),
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // To make the card compact
-            children: <Widget>[
-              const Text(
-                'Scan Successful!',
-                style: TextStyle(
-                  fontSize: 24.0,
-                  fontWeight: FontWeight.w700,
+              // Laser animation
+              if (laserAnimation)
+                AnimatedBuilder(
+                  animation: animationController,
+                  builder: (context, _) => Positioned(
+                    top: scanWindowSize * animationController.value - 1,
+                    left: 12,
+                    right: 12,
+                    child: Container(
+                      height: 2,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            const Color(0xFF00ACC1),
+                            const Color(0xFF00ACC1),
+                            Colors.transparent,
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF00ACC1).withAlpha(180),
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16.0),
-              Text(
-                scanResult,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16.0,
-                ),
-              ),
-              const SizedBox(height: 24.0),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('SCAN AGAIN'),
-                ),
-              ),
             ],
           ),
         ),
-        // Top Icon
-        Positioned(
-          left: 16.0,
-          right: 16.0,
-          child: CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.secondary,
-            radius: 45.0,
-            child: const Icon(
-              Icons.check,
-              color: Colors.white,
-              size: 50.0,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class BarcodeBoxPainter extends CustomPainter {
-  final double cornerLength;
-  final double strokeWidth;
-  final Color color;
+class _OverlayPainter extends CustomPainter {
+  final double scanWindowSize;
 
-  BarcodeBoxPainter({
-    this.cornerLength = 30.0,
-    this.strokeWidth = 5.0,
-    this.color = Colors.green,
-  });
+  const _OverlayPainter({required this.scanWindowSize});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-
-    // Top-left corner
-    path.moveTo(0, cornerLength);
-    path.lineTo(0, 0);
-    path.lineTo(cornerLength, 0);
-
-    // Top-right corner
-    path.moveTo(size.width - cornerLength, 0);
-    path.lineTo(size.width, 0);
-    path.lineTo(size.width, cornerLength);
-
-    // Bottom-left corner
-    path.moveTo(0, size.height - cornerLength);
-    path.lineTo(0, size.height);
-    path.lineTo(cornerLength, size.height);
-
-    // Bottom-right corner
-    path.moveTo(size.width - cornerLength, size.height);
-    path.lineTo(size.width, size.height);
-    path.lineTo(size.width, size.height - cornerLength);
-
+    final paint = Paint()..color = Colors.black.withAlpha(160);
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    final half = scanWindowSize / 2;
+    final rect = Rect.fromLTRB(
+      centerX - half, centerY - half,
+      centerX + half, centerY + half,
+    );
+    final fullRect = Offset.zero & size;
+    final path = Path()
+      ..addRect(fullRect)
+      ..addRRect(RRect.fromRectAndRadius(rect, const Radius.circular(4)))
+      ..fillType = PathFillType.evenOdd;
     canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
+  bool shouldRepaint(_OverlayPainter old) => old.scanWindowSize != scanWindowSize;
+}
+
+class _CornerPainter extends CustomPainter {
+  final Color color;
+  const _CornerPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const len = 28.0;
+    const sw = 4.0;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = sw
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path();
+    // Top-left
+    path.moveTo(0, len); path.lineTo(0, 0); path.lineTo(len, 0);
+    // Top-right
+    path.moveTo(size.width - len, 0); path.lineTo(size.width, 0); path.lineTo(size.width, len);
+    // Bottom-left
+    path.moveTo(0, size.height - len); path.lineTo(0, size.height); path.lineTo(len, size.height);
+    // Bottom-right
+    path.moveTo(size.width - len, size.height); path.lineTo(size.width, size.height); path.lineTo(size.width, size.height - len);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_CornerPainter old) => old.color != color;
+}
+
+// ── Scan result dialog ────────────────────────────────────────────────────────
+class _ScanResultDialog extends StatelessWidget {
+  final String scanResult;
+  final VoidCallback onScanAgain;
+
+  const _ScanResultDialog({required this.scanResult, required this.onScanAgain});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Theme.of(context).cardColor,
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00ACC1).withAlpha(30),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_circle_rounded, color: Color(0xFF00ACC1), size: 48),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Scan Successful!',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: SelectableText(
+              scanResult,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: onScanAgain,
+          child: const Text('SCAN AGAIN', style: TextStyle(color: Color(0xFF00ACC1), fontWeight: FontWeight.bold)),
+        ),
+      ],
+    );
   }
 }
