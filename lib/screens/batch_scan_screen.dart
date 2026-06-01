@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:scanairz/models/batch.dart';
 import 'package:scanairz/models/scan_result.dart';
+import 'package:scanairz/services/pc_connector.dart';
+import 'package:scanairz/services/permission_service.dart';
 import 'package:scanairz/services/settings_service.dart';
 import 'package:scanairz/services/storage_service.dart';
 import 'package:share_plus/share_plus.dart';
@@ -39,6 +41,15 @@ class _BatchScanScreenState extends State<BatchScanScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
+    _initScanner();
+  }
+
+  Future<void> _initScanner() async {
+    final permissionService = Provider.of<PermissionService>(context, listen: false);
+    await permissionService.requestCameraPermission();
+    if (mounted) {
+      _scannerController.start();
+    }
   }
 
   @override
@@ -69,23 +80,34 @@ class _BatchScanScreenState extends State<BatchScanScreen>
     super.dispose();
   }
 
-  void _onBarcodeDetected(BarcodeCapture capture) {
+  void _onBarcodeDetected(BarcodeCapture capture) async {
     final barcodes = capture.barcodes;
     if (barcodes.isNotEmpty) {
       final barcode = barcodes.first;
       if (barcode.rawValue != null && mounted) {
         if (_scannedBarcodes.isEmpty ||
             _scannedBarcodes.last.barcode != barcode.rawValue) {
+          final newScan = ScanResult(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            barcode: barcode.rawValue!,
+            format: barcode.format.toString(),
+            timestamp: DateTime.now(),
+          );
+          
           setState(() {
-            _scannedBarcodes.add(ScanResult(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              barcode: barcode.rawValue!,
-              format: barcode.format.toString(),
-              timestamp: DateTime.now(),
-            ));
+            _scannedBarcodes.add(newScan);
           });
+          
           if (_vibration) Vibration.vibrate(duration: 80);
           _audioPlayer.play(AssetSource('sounds/beep.mp3'));
+
+          // Continuous Sync if connected
+          final pcConnector = Provider.of<PcConnector>(context, listen: false);
+          if (pcConnector.isConnected) {
+            try {
+              await pcConnector.syncData([newScan]);
+            } catch (_) {}
+          }
         }
       }
     }
@@ -97,6 +119,9 @@ class _BatchScanScreenState extends State<BatchScanScreen>
     // Viewfinder takes up ~40% of screen height in batch mode (list needs room below)
     final double viewfinderHeight = size.height * 0.40;
     final theme = Theme.of(context);
+
+    // Padding for the camera view to avoid overlap with app bar and status bar
+    final double topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
 
     return Scaffold(
       appBar: AppBar(
@@ -148,6 +173,7 @@ class _BatchScanScreenState extends State<BatchScanScreen>
               children: [
                 MobileScanner(
                   controller: _scannerController,
+                  scanWindow: Rect.fromLTWH(0, 0, size.width, viewfinderHeight),
                   onDetect: _onBarcodeDetected,
                 ),
                 // Laser animation

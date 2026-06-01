@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:scanairz/models/scan_result.dart';
+import 'package:scanairz/services/permission_service.dart';
 import 'package:scanairz/services/pc_connector.dart';
 import 'package:scanairz/services/settings_service.dart';
 import 'package:scanairz/services/storage_service.dart';
@@ -37,6 +38,15 @@ class _SingleScanScreenState extends State<SingleScanScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
+    _initScanner();
+  }
+
+  Future<void> _initScanner() async {
+    final permissionService = Provider.of<PermissionService>(context, listen: false);
+    await permissionService.requestCameraPermission();
+    if (mounted) {
+      _scannerController.start();
+    }
   }
 
   @override
@@ -101,6 +111,11 @@ class _SingleScanScreenState extends State<SingleScanScreen>
               Positioned.fill(
                 child: MobileScanner(
                   controller: _scannerController,
+                  scanWindow: Rect.fromCenter(
+                    center: Offset(size.width / 2, size.height / 2),
+                    width: scanWindowSize,
+                    height: scanWindowSize,
+                  ),
                   onDetect: (capture) {
                     final barcodes = capture.barcodes;
                     if (barcodes.isNotEmpty) {
