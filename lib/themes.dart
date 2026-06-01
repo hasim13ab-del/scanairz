@@ -48,7 +48,7 @@ class AppThemes {
       ),
     ),
     scaffoldBackgroundColor: const Color(0xFFF0F4F8),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: Colors.white,
@@ -88,7 +88,7 @@ class AppThemes {
       ),
       labelStyle: const TextStyle(color: navyMid),
     ),
-    tabBarTheme: const TabBarTheme(
+    tabBarTheme: const TabBarThemeData(
       labelColor: teal,
       unselectedLabelColor: Color(0xFF90A4AE),
       indicatorColor: teal,
@@ -141,7 +141,7 @@ class AppThemes {
       ),
     ),
     scaffoldBackgroundColor: navyDark,
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: navyMid,
@@ -180,7 +180,7 @@ class AppThemes {
         borderSide: const BorderSide(color: teal, width: 2),
       ),
     ),
-    tabBarTheme: const TabBarTheme(
+    tabBarTheme: const TabBarThemeData(
       labelColor: teal,
       unselectedLabelColor: Color(0xFF546E7A),
       indicatorColor: teal,
