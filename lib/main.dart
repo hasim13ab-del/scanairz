@@ -23,6 +23,8 @@ Future<void> main() async {
   final storageService = StorageService();
   final pcConnector = PcConnector();
   final permissionService = PermissionService();
+  
+  await permissionService.requestCameraPermission();
 
   runApp(
     MultiProvider(

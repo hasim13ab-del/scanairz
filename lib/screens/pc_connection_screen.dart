@@ -237,52 +237,51 @@ class _PcConnectionScreenState extends State<PcConnectionScreen> with SingleTick
   }
 
   Widget _buildBluetoothTab() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.bluetooth_searching, size: 80, color: Colors.blue),
-            const SizedBox(height: 24),
-            const Text('Bluetooth Connectivity', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            const Text('Pair your phone with your Windows PC first. Then select the PC from the list of paired devices to start syncing.', 
-                       textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, height: 1.5)),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: null, // Stub for now
-              style: ElevatedButton.styleFrom(minimumSize: const Size(200, 50)),
-              child: const Text('Scan for Paired PC'),
-            ),
-          ],
-        ),
-      ),
+    return FutureBuilder(
+      future: _pcConnector.getBluetoothDevices(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final devices = snapshot.data!;
+        return ListView.builder(
+          itemCount: devices.length,
+          itemBuilder: (context, i) {
+            final d = devices[i];
+            final active = _isConnected && _pcConnector.activeType == ConnectionType.bluetooth;
+            return ListTile(
+              leading: const Icon(Icons.bluetooth),
+              title: Text(d.name ?? 'Unknown'),
+              subtitle: Text(d.address),
+              trailing: active ? const Text('Connected', style: TextStyle(color: Colors.green)) : null,
+              onTap: active ? null : () => _pcConnector.connectBluetooth(d.address),
+            );
+          },
+        );
+      },
     );
   }
 
   Widget _buildUsbTab() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.usb, size: 80, color: Colors.orange),
-            const SizedBox(height: 24),
-            const Text('USB Connectivity', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            const Text('Connect your phone via USB cable and ensure "USB Debugging" or "File Transfer" is enabled.', 
-                       textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, height: 1.5)),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: null, // Stub for now
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white, minimumSize: const Size(200, 50)),
-              child: const Text('Detect Connection'),
-            ),
-          ],
-        ),
-      ),
+    return FutureBuilder(
+      future: _pcConnector.getUsbDevices(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final devices = snapshot.data!;
+        if (devices.isEmpty) return const Center(child: Text('No USB devices found'));
+        return ListView.builder(
+          itemCount: devices.length,
+          itemBuilder: (context, i) {
+            final d = devices[i];
+            final active = _isConnected && _pcConnector.activeType == ConnectionType.usb;
+            return ListTile(
+              leading: const Icon(Icons.usb),
+              title: Text('Device ${d.vid}:${d.pid}'),
+              subtitle: Text('Product: ${d.productName ?? "Unknown"}'),
+              trailing: active ? const Text('Connected', style: TextStyle(color: Colors.green)) : null,
+              onTap: active ? null : () => _pcConnector.connectUsb(d),
+            );
+          },
+        );
+      },
     );
   }
 
