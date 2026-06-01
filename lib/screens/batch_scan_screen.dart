@@ -52,7 +52,7 @@ class _BatchScanScreenState extends State<BatchScanScreen>
     await permissionService.requestCameraPermission();
     if (mounted) {
       _scannerController.start();
-      _scannerController.setZoom(0.1);
+      _scannerController.setZoomScale(0.1);
     }
   }
 
