@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 // ── Win32 keyboard FFI ────────────────────────────────────────────────────────
@@ -24,21 +25,24 @@ const int _keyEventUp  = 0x0002;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
-  await windowManager.waitUntilReadyToShow(
-    const WindowOptions(
-      size:        Size(960, 720),
-      minimumSize: Size(800, 600),
-      title:       'ScanAiRZ PC Companion',
-      center:      true,
-      backgroundColor: Colors.transparent,
-      skipTaskbar: false,
-      titleBarStyle: TitleBarStyle.normal,
-    ),
-    () async {
-      await windowManager.show();
-      await windowManager.focus();
-    },
+  
+  const windowOptions = WindowOptions(
+    size:        Size(960, 720),
+    minimumSize: Size(800, 600),
+    title:       'ScanAiRZ PC Companion',
+    center:      true,
+    backgroundColor: Colors.transparent,
+    skipTaskbar: false,
+    titleBarStyle: TitleBarStyle.normal,
   );
+
+  await windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.show();
+    await windowManager.focus();
+  });
+
+  await windowManager.setPreventClose(true);
+
   runApp(const CompanionApp());
 }
 
@@ -79,7 +83,7 @@ class DashboardPage extends StatefulWidget {
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> with SingleTickerProviderStateMixin {
+class _DashboardPageState extends State<DashboardPage> with SingleTickerProviderStateMixin, TrayListener, WindowListener {
   // Server state
   ServerSocket?    _server;
   RawDatagramSocket? _udpSocket;
@@ -101,8 +105,52 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
+    _initTray();
+    windowManager.addListener(this);
+    trayManager.addListener(this);
     _fetchLocalIps();
     _tabController = TabController(length: 3, vsync: this);
+  }
+
+  Future<void> _initTray() async {
+    await trayManager.setIcon(
+      Platform.isWindows
+          ? 'assets/app_icon.png' // tray_manager handles png on windows usually or ico
+          : 'assets/app_icon.png',
+    );
+    final Menu menu = Menu(
+      items: [
+        MenuItem(key: 'show_window', label: 'Show ScanAiRZ'),
+        MenuItem.separator(),
+        MenuItem(key: 'exit_app', label: 'Exit'),
+      ],
+    );
+    await trayManager.setContextMenu(menu);
+  }
+
+  @override
+  void onTrayIconMouseDown() {
+    windowManager.show();
+    windowManager.focus();
+  }
+
+  @override
+  void onTrayMenuItemClick(MenuItem menuItem) {
+    if (menuItem.key == 'show_window') {
+      windowManager.show();
+      windowManager.focus();
+    } else if (menuItem.key == 'exit_app') {
+      _stopServer();
+      exit(0);
+    }
+  }
+
+  @override
+  void onWindowClose() async {
+    bool isPreventClose = await windowManager.isPreventClose();
+    if (isPreventClose) {
+      await windowManager.hide();
+    }
   }
 
   Future<void> _fetchLocalIps() async {
@@ -236,6 +284,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
+    trayManager.removeListener(this);
     _stopServer();
     _portController.dispose();
     _logScrollCtrl.dispose();

@@ -24,6 +24,10 @@ class PcConnector {
   ConnectionType _activeType = ConnectionType.wifi;
   ConnectionType get activeType => _activeType;
 
+  String? _lastIp;
+  int? _lastPort;
+  Timer? _reconnectTimer;
+
   final StreamController<bool> _statusController =
       StreamController<bool>.broadcast();
   Stream<bool> get connectionStatus => _statusController.stream;
@@ -42,11 +46,14 @@ class PcConnector {
   // ── WiFi connection ───────────────────────────────────────────────────────
   Future<bool> connectWifi(String ipAddress, int port) async {
     _activeType = ConnectionType.wifi;
+    _lastIp = ipAddress;
+    _lastPort = port;
     if (_socket != null) return true;
     try {
       _socket = await Socket.connect(ipAddress, port,
           timeout: const Duration(seconds: 5));
       _statusController.add(true);
+      _reconnectTimer?.cancel();
       _socket!.listen(
         (_) {},
         onDone: () => _onWifiDone(),
@@ -64,6 +71,21 @@ class PcConnector {
   void _onWifiDone() {
     _socket = null;
     _statusController.add(false);
+    _startReconnectTimer();
+  }
+
+  void _startReconnectTimer() {
+    _reconnectTimer?.cancel();
+    if (_lastIp == null || _lastPort == null) return;
+    
+    _reconnectTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      if (isConnected) {
+        timer.cancel();
+        return;
+      }
+      debugPrint('PcConnector: Attempting auto-reconnect to $_lastIp:$_lastPort...');
+      await connectWifi(_lastIp!, _lastPort!);
+    });
   }
 
   // ── Bluetooth connection ──────────────────────────────────────────────────
@@ -97,6 +119,9 @@ class PcConnector {
 
   // ── Disconnect (any) ──────────────────────────────────────────────────────
   void disconnect() {
+    _reconnectTimer?.cancel();
+    _lastIp = null;
+    _lastPort = null;
     switch (_activeType) {
       case ConnectionType.wifi:
         _socket?.destroy();
