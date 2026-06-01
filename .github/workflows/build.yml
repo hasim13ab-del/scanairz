@@ -2,9 +2,9 @@ name: Build ScanAiRZ Applications
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, full-release ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, full-release ]
 
 jobs:
   build-android:
@@ -37,7 +37,7 @@ jobs:
               if [ -f "$MANIFEST" ]; then
                 PKG=$(grep -oP 'package="\K[^"]+' "$MANIFEST" || true)
                 if [ -n "$PKG" ]; then
-                  sed -i "s/android {/android {\n    namespace '$PKG'/" "$f"
+                  sed -i "s/android {/android {\\n    namespace '$PKG'/" "$f"
                   echo "Patched namespace: $PKG"
                 fi
               fi
@@ -53,14 +53,14 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/scanairz-release.jks
-          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=scanairz-release.jks\n' \
-            "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" \
+          printf 'storePassword=%s\\nkeyPassword=%s\\nkeyAlias=%s\\nstoreFile=scanairz-release.jks\\n' \\
+            "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" \\
             > android/key.properties
           echo "Signing keystore configured."
 
       - name: Patch flutter_bluetooth_serial namespace
         run: |
-          sed -i "s/android {/android {\n    namespace 'io.github.edufolly.flutterbluetoothserial'/" $HOME/.pub-cache/hosted/pub.dev/flutter_bluetooth_serial-0.4.0/android/build.gradle
+          sed -i "s/android {/android {\\n    namespace 'io.github.edufolly.flutterbluetoothserial'/" $HOME/.pub-cache/hosted/pub.dev/flutter_bluetooth_serial-0.4.0/android/build.gradle
           sed -i "s/compileSdkVersion 30/compileSdkVersion 33/" $HOME/.pub-cache/hosted/pub.dev/flutter_bluetooth_serial-0.4.0/android/build.gradle
 
       - name: Build release APK
@@ -109,7 +109,7 @@ jobs:
         shell: pwsh
         run: |
           $src = "tools/pc_companion/build/windows/x64/runner/Release"
-          Compress-Archive -Path "$src\*" -DestinationPath "scanairz-pc-companion.zip" -Force
+          Compress-Archive -Path "$src\\*" -DestinationPath "scanairz-pc-companion.zip" -Force
 
       - name: Upload PC Companion
         uses: actions/upload-artifact@v4
