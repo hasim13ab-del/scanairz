@@ -261,27 +261,58 @@ class _PcConnectionScreenState extends State<PcConnectionScreen> with SingleTick
   }
 
   Widget _buildUsbTab() {
-    return FutureBuilder(
-      future: _pcConnector.getUsbDevices(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final devices = snapshot.data!;
-        if (devices.isEmpty) return const Center(child: Text('No USB devices found'));
-        return ListView.builder(
-          itemCount: devices.length,
-          itemBuilder: (context, i) {
-            final d = devices[i];
-            final active = _isConnected && _pcConnector.activeType == ConnectionType.usb;
-            return ListTile(
-              leading: const Icon(Icons.usb),
-              title: Text('Device ${d.vid}:${d.pid}'),
-              subtitle: Text('Product: ${d.productName ?? "Unknown"}'),
-              trailing: active ? const Text('Connected', style: TextStyle(color: Colors.green)) : null,
-              onTap: active ? null : () => _pcConnector.connectUsb(d),
-            );
-          },
-        );
-      },
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.withAlpha(20),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.withAlpha(50)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: Colors.blue),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Tip: For the easiest USB connection, enable "USB Tethering" in your phone settings and use the WiFi tab to connect.',
+                  style: TextStyle(fontSize: 13, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: Text('DIRECT SERIAL (ADVANCED)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        ),
+        Expanded(
+          child: FutureBuilder(
+            future: _pcConnector.getUsbDevices(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              final devices = snapshot.data!;
+              if (devices.isEmpty) return const Center(child: Text('No Serial USB devices found'));
+              return ListView.builder(
+                itemCount: devices.length,
+                itemBuilder: (context, i) {
+                  final d = devices[i];
+                  final active = _isConnected && _pcConnector.activeType == ConnectionType.usb;
+                  return ListTile(
+                    leading: const Icon(Icons.usb),
+                    title: Text('Device ${d.vid}:${d.pid}'),
+                    subtitle: Text('Product: ${d.productName ?? "Unknown"}'),
+                    trailing: active ? const Text('Connected', style: TextStyle(color: Colors.green)) : null,
+                    onTap: active ? null : () => _pcConnector.connectUsb(d),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

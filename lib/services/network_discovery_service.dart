@@ -56,7 +56,12 @@ class NetworkDiscoveryService {
   void _broadcastDiscoveryMessage() {
     const discoveryMessage = 'scanairz_discovery';
     final data = discoveryMessage.codeUnits;
+    // Standard broadcast
     _socket?.send(data, InternetAddress('255.255.255.255'), 8888);
+    // Direct discovery for Hotspot/USB Tethering gateway (common IPs)
+    _socket?.send(data, InternetAddress('192.168.43.1'), 8888);  // Android Hotspot
+    _socket?.send(data, InternetAddress('192.168.42.129'), 8888); // USB Tethering common
+    _socket?.send(data, InternetAddress('172.20.10.1'), 8888);   // iOS Hotspot
   }
 
   String _formatDiscoveredDevice(String address, List<int> data) {

@@ -18,7 +18,10 @@ class SingleScanScreen extends StatefulWidget {
 class _SingleScanScreenState extends State<SingleScanScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  final MobileScannerController _scannerController = MobileScannerController();
+  final MobileScannerController _scannerController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.unrestricted,
+    facing: CameraFacing.back,
+  );
   late SettingsService _settingsService;
   late StorageService _storageService;
   late PcConnector _pcConnector;

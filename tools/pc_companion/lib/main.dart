@@ -54,6 +54,11 @@ class CompanionApp extends StatelessWidget {
     return MaterialApp(
       title: 'ScanAiRZ PC Companion',
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return Scaffold(
+          body: child,
+        );
+      },
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,

@@ -16,7 +16,7 @@
     <uses-permission android:name="android.permission.USB_PERMISSION" />
 
     <application
-        android:label="scanairz"
+        android:label="ScanAiRZ"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

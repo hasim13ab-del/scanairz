@@ -25,7 +25,10 @@ class BatchScanScreen extends StatefulWidget {
 class _BatchScanScreenState extends State<BatchScanScreen>
     with SingleTickerProviderStateMixin {
   final List<ScanResult> _scannedBarcodes = [];
-  final MobileScannerController _scannerController = MobileScannerController();
+  final MobileScannerController _scannerController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.unrestricted,
+    facing: CameraFacing.back,
+  );
   final AudioPlayer _audioPlayer = AudioPlayer();
   late SettingsService _settingsService;
   late StorageService _storageService;
@@ -120,9 +123,6 @@ class _BatchScanScreenState extends State<BatchScanScreen>
     // Viewfinder takes up ~40% of screen height in batch mode (list needs room below)
     final double viewfinderHeight = size.height * 0.40;
     final theme = Theme.of(context);
-
-    // Padding for the camera view to avoid overlap with app bar and status bar
-    final double topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
 
     return Scaffold(
       appBar: AppBar(
